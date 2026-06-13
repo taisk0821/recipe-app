@@ -49,6 +49,27 @@ const CARD_GRADIENTS = [
   "linear-gradient(140deg, #4E3845 0%, #3A2C38 100%)",
 ];
 
+const RECIPE_SEARCH_TERMS = {
+  1: "miso pork stir fry japanese",
+  2: "omelette egg dish",
+  3: "egg fried rice japanese",
+  4: "tofu soup japanese",
+  5: "teriyaki chicken japanese",
+  6: "steamed pork cabbage",
+  7: "natto rice bowl japanese",
+  8: "bean sprouts pork stir fry",
+  9: "tomato egg chinese stir fry",
+  10: "potato onion soup",
+  11: "grilled salmon japanese",
+  12: "kimchi tofu stew korean",
+  13: "tuna salad fresh",
+  14: "eggplant stir fry miso",
+  15: "fried rice egg green onion",
+};
+
+const UNSPLASH_CACHE_KEY = "unsplash_cache_v2";
+const UNSPLASH_CACHE_TTL = 24 * 60 * 60 * 1000;
+
 const UNITS = {
   卵: "個", 豚肉: "g", 鶏肉: "g", キャベツ: "g", にんじん: "本", 玉ねぎ: "個", ねぎ: "本",
   豆腐: "丁", ごはん: "杯", じゃがいも: "個", トマト: "個", なす: "本", もやし: "袋",
@@ -328,6 +349,11 @@ export default function FridgeMenuApp() {
   const [mainMode, setMainMode] = useState("fridge");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTags, setSearchTags] = useState(new Set());
+  const [recipeImages, setRecipeImages] = useState(() => {
+    const cached = LS.get(UNSPLASH_CACHE_KEY, null);
+    if (cached && Date.now() - cached.fetchedAt < UNSPLASH_CACHE_TTL) return cached.images;
+    return {};
+  });
 
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
@@ -340,6 +366,37 @@ export default function FridgeMenuApp() {
   useEffect(() => { LS.set("shoppingList", shoppingList); }, [shoppingList]);
   useEffect(() => { LS.set("shoppingMemo", shoppingMemo); }, [shoppingMemo]);
   useEffect(() => { LS.set("ratings", ratings); }, [ratings]);
+
+  useEffect(() => {
+    const apiKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
+    if (!apiKey) return;
+    const cached = LS.get(UNSPLASH_CACHE_KEY, null);
+    if (cached && Date.now() - cached.fetchedAt < UNSPLASH_CACHE_TTL) return;
+
+    const fetchAll = async () => {
+      const pairs = await Promise.all(
+        Object.entries(RECIPE_SEARCH_TERMS).map(async ([id, term]) => {
+          try {
+            const res = await fetch(
+              `https://api.unsplash.com/search/photos?query=${encodeURIComponent(term)}&per_page=1&orientation=landscape&content_filter=high`,
+              { headers: { Authorization: `Client-ID ${apiKey}` } }
+            );
+            if (!res.ok) return null;
+            const data = await res.json();
+            const photo = data.results?.[0];
+            if (!photo?.urls?.small) return null;
+            return [id, { url: photo.urls.small, photographer: photo.user.name }];
+          } catch {
+            return null;
+          }
+        })
+      );
+      const images = Object.fromEntries(pairs.filter(Boolean));
+      setRecipeImages(images);
+      LS.set(UNSPLASH_CACHE_KEY, { fetchedAt: Date.now(), images });
+    };
+    fetchAll();
+  }, []);
 
   const selectedNames = Object.keys(fridge);
   const recentIds = new Set(history.slice(-3).map((h) => h.id));
@@ -959,6 +1016,7 @@ export default function FridgeMenuApp() {
                   const emoji = RECIPE_EMOJIS[recipe.id] || "🍽️";
                   const gradient = CARD_GRADIENTS[recipe.id % CARD_GRADIENTS.length];
                   const recipeRating = ratings[recipe.id] || { good: 0, bad: 0 };
+                  const photo = recipeImages[String(recipe.id)];
                   return (
                     <section key={recipe.id} className="fade-up rounded-2xl overflow-hidden"
                       style={{
@@ -967,17 +1025,23 @@ export default function FridgeMenuApp() {
                       }}>
 
                       {/* カラーヘッダー */}
-                      <div style={{ background: gradient, padding: "1.25rem", position: "relative", overflow: "hidden" }}>
-                        {/* 背景デコ絵文字 */}
-                        <div aria-hidden="true" style={{
-                          position: "absolute", right: "-0.25rem", top: "-0.75rem",
-                          fontSize: "7rem", lineHeight: 1, opacity: 0.1,
-                          pointerEvents: "none", userSelect: "none",
-                        }}>{emoji}</div>
+                      <div style={{
+                        background: photo ? `url(${photo.url}) center/cover no-repeat` : gradient,
+                        padding: "1.25rem", position: "relative", overflow: "hidden",
+                        minHeight: photo ? "170px" : undefined,
+                      }}>
+                        {photo && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.72) 100%)" }} />}
+                        {!photo && (
+                          <div aria-hidden="true" style={{
+                            position: "absolute", right: "-0.25rem", top: "-0.75rem",
+                            fontSize: "7rem", lineHeight: 1, opacity: 0.1,
+                            pointerEvents: "none", userSelect: "none",
+                          }}>{emoji}</div>
+                        )}
 
                         {/* ラベル行 */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", position: "relative" }}>
-                          <p style={{ color: isTop ? COLORS.accent : "rgba(255,255,255,0.55)", fontFamily: MONO_FONT, fontSize: "0.7rem", letterSpacing: "0.2em" }}>
+                          <p style={{ color: isTop ? COLORS.accent : "rgba(255,255,255,0.75)", fontFamily: MONO_FONT, fontSize: "0.7rem", letterSpacing: "0.2em" }}>
                             {randomPick ? "★ 運命の一品" : isTop ? "★ 本日のおすすめ" : `候補 ${pageIndex * pageSize + index + 1}`}
                           </p>
                           {recipe.useSoonHit > 0 && (
@@ -988,14 +1052,15 @@ export default function FridgeMenuApp() {
                           )}
                         </div>
 
-                        {/* 絵文字 + タイトル */}
+                        {/* タイトル */}
                         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative", marginBottom: "0.75rem" }}>
-                          <span style={{ fontSize: "3rem", lineHeight: 1, flexShrink: 0 }}>{emoji}</span>
+                          {!photo && <span style={{ fontSize: "3rem", lineHeight: 1, flexShrink: 0 }}>{emoji}</span>}
                           <h3 style={{
                             fontFamily: DISPLAY_FONT,
                             fontSize: isTop ? "1.85rem" : "1.5rem",
                             color: "#fff",
                             lineHeight: 1.2,
+                            textShadow: photo ? "0 1px 4px rgba(0,0,0,0.7)" : "none",
                           }}>{recipe.name}</h3>
                         </div>
 
@@ -1042,6 +1107,11 @@ export default function FridgeMenuApp() {
                             );
                           })}
                         </div>
+                        {photo && (
+                          <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>
+                            📷 {photo.photographer} / Unsplash
+                          </p>
+                        )}
                       </div>
 
                       {/* カードボディ */}
@@ -1243,17 +1313,23 @@ export default function FridgeMenuApp() {
                         const gradient = CARD_GRADIENTS[recipe.id % CARD_GRADIENTS.length];
                         const recipeRating = ratings[recipe.id] || { good: 0, bad: 0 };
                         const missingDetails = recipe.details.filter((d) => d.status !== "ok");
+                        const photo = recipeImages[String(recipe.id)];
                         return (
                           <section key={recipe.id} className="fade-up rounded-2xl overflow-hidden"
                             style={{ border: `2px solid ${COLORS.border}` }}>
 
                             {/* カラーヘッダー */}
-                            <div style={{ background: gradient, padding: "1.25rem", position: "relative", overflow: "hidden" }}>
-                              <div aria-hidden="true" style={{ position: "absolute", right: "-0.25rem", top: "-0.75rem", fontSize: "7rem", lineHeight: 1, opacity: 0.1, pointerEvents: "none", userSelect: "none" }}>{emoji}</div>
+                            <div style={{
+                              background: photo ? `url(${photo.url}) center/cover no-repeat` : gradient,
+                              padding: "1.25rem", position: "relative", overflow: "hidden",
+                              minHeight: photo ? "160px" : undefined,
+                            }}>
+                              {photo && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.72) 100%)" }} />}
+                              {!photo && <div aria-hidden="true" style={{ position: "absolute", right: "-0.25rem", top: "-0.75rem", fontSize: "7rem", lineHeight: 1, opacity: 0.1, pointerEvents: "none", userSelect: "none" }}>{emoji}</div>}
 
                               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative", marginBottom: "0.75rem" }}>
-                                <span style={{ fontSize: "3rem", lineHeight: 1, flexShrink: 0 }}>{emoji}</span>
-                                <h3 style={{ fontFamily: DISPLAY_FONT, fontSize: "1.5rem", color: "#fff", lineHeight: 1.2 }}>{recipe.name}</h3>
+                                {!photo && <span style={{ fontSize: "3rem", lineHeight: 1, flexShrink: 0 }}>{emoji}</span>}
+                                <h3 style={{ fontFamily: DISPLAY_FONT, fontSize: "1.5rem", color: "#fff", lineHeight: 1.2, textShadow: photo ? "0 1px 4px rgba(0,0,0,0.7)" : "none" }}>{recipe.name}</h3>
                               </div>
 
                               <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative", marginBottom: "0.75rem" }}>
@@ -1283,6 +1359,11 @@ export default function FridgeMenuApp() {
                                   );
                                 })}
                               </div>
+                              {photo && (
+                                <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>
+                                  📷 {photo.photographer} / Unsplash
+                                </p>
+                              )}
                             </div>
 
                             {/* ボディ */}

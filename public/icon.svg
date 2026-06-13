@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#283831"/>
+
+  <!-- Steam (left) -->
+  <path d="M204 192 C204 164 228 164 228 136 C228 108 204 108 204 80"
+    stroke="#F4F1E8" stroke-width="13" fill="none" stroke-linecap="round" opacity="0.65"/>
+  <!-- Steam (right) -->
+  <path d="M308 192 C308 164 332 164 332 136 C332 108 308 108 308 80"
+    stroke="#F4F1E8" stroke-width="13" fill="none" stroke-linecap="round" opacity="0.65"/>
+
+  <!-- Rice dome -->
+  <path d="M108 276 C108 164 404 164 404 276 Z" fill="#F4F1E8"/>
+
+  <!-- Bowl rim -->
+  <rect x="104" y="268" width="304" height="32" rx="16" fill="#F2C14E"/>
+
+  <!-- Bowl body -->
+  <path d="M120 300 Q256 424 392 300 Z" fill="#F2C14E"/>
+  <!-- Bowl inner shading -->
+  <path d="M150 300 Q256 402 362 300 Z" fill="#E8744A" opacity="0.75"/>
+</svg>

@@ -3,6 +3,7 @@ import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
   Trash2, Camera, ImageOff, Menu, ChevronLeft,
+  HardDrive, Download, Upload,
 } from "lucide-react";
 
 const COLORS = {
@@ -280,6 +281,7 @@ const NAV_ITEMS = [
   { page: "pantry",   label: "調味料棚",     icon: Soup },
   { page: "shopping", label: "買い物リスト",  icon: ShoppingCart },
   { page: "history",  label: "履歴",          icon: History },
+  { page: "data",     label: "データ管理",    icon: HardDrive },
 ];
 
 export default function FridgeMenuApp() {
@@ -311,6 +313,7 @@ export default function FridgeMenuApp() {
 
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
+  const importFileRef = useRef(null);
 
   useEffect(() => { LS.set("fridge", fridge); }, [fridge]);
   useEffect(() => { LS.set("pantry", [...pantry]); }, [pantry]);
@@ -427,6 +430,58 @@ export default function FridgeMenuApp() {
   };
 
   const navigate = (page) => { setCurrentPage(page); setSideMenuOpen(false); };
+
+  const exportData = () => {
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      fridge,
+      pantry: [...pantry],
+      servings,
+      history: history.map((h) => ({ ...h, at: h.at.toISOString() })),
+      shoppingList,
+      shoppingMemo,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gohan-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!window.confirm("現在のデータをすべて上書きして復元しますか？")) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.fridge !== undefined) setFridge(data.fridge);
+        if (data.pantry !== undefined) setPantry(new Set(data.pantry));
+        if (data.servings !== undefined) setServings(data.servings);
+        if (data.history !== undefined) {
+          let t = 0;
+          setHistory(data.history.map((h) => ({ ...h, uid: h.uid ?? --t, at: new Date(h.at) })));
+        }
+        if (data.shoppingList !== undefined) {
+          setShoppingList(data.shoppingList.map((item) =>
+            typeof item === "string" ? { text: item, bought: false } : item
+          ));
+        }
+        if (data.shoppingMemo !== undefined) setShoppingMemo(data.shoppingMemo);
+        alert("復元が完了しました");
+      } catch {
+        alert("読み込みに失敗しました。正しいバックアップファイルか確認してください。");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const sortedRecipes = useMemo(() => {
     const factor = servings / 2;
@@ -1107,6 +1162,47 @@ export default function FridgeMenuApp() {
                 </p>
               </>
             )}
+          </>
+        )}
+
+        {/* ── DATA ── */}
+        {currentPage === "data" && (
+          <>
+            <div className="flex items-center gap-2 mb-6">
+              <HardDrive size={20} style={{ color: COLORS.accent }} />
+              <h1 style={{ fontFamily: DISPLAY_FONT, fontSize: "2rem", color: COLORS.chalk }}>データ管理</h1>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <div className="p-4 rounded-xl" style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+                <h2 className="text-sm font-bold mb-1">バックアップ(書き出し)</h2>
+                <p className="text-xs mb-4" style={{ color: COLORS.muted }}>
+                  調味料棚・履歴(写真含む)・買い物リスト・メモをJSONファイルとして端末に保存します。
+                </p>
+                <button onClick={exportData}
+                  className="chalk-btn w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                  style={{ backgroundColor: COLORS.accent, color: COLORS.bg }}>
+                  <Download size={16} />
+                  データをダウンロード
+                </button>
+              </div>
+
+              <div className="p-4 rounded-xl" style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+                <h2 className="text-sm font-bold mb-1">復元(読み込み)</h2>
+                <p className="text-xs mb-4" style={{ color: COLORS.muted }}>
+                  バックアップファイルを読み込んでデータを復元します。現在のデータはすべて上書きされます。
+                </p>
+                <button onClick={() => importFileRef.current?.click()}
+                  className="chalk-btn w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                  style={{ backgroundColor: "transparent", color: COLORS.chalk, border: `1px solid ${COLORS.border}` }}>
+                  <Upload size={16} />
+                  ファイルから復元
+                </button>
+              </div>
+            </div>
+
+            <input ref={importFileRef} type="file" accept="application/json,.json"
+              onChange={handleImport} style={{ display: "none" }} aria-hidden="true" />
           </>
         )}
 

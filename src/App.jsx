@@ -3,18 +3,18 @@ import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
   Trash2, Camera, ImageOff, Menu, ChevronLeft,
-  HardDrive, Download, Upload, Home, Search,
+  HardDrive, Download, Upload, Home, Search, CalendarDays,
 } from "lucide-react";
 
 const COLORS = {
-  bg: "#283831",
-  surface: "#34453C",
-  surfaceAlt: "#3E5048",
+  bg: "#2E3D36",
+  surface: "#384E45",
+  surfaceAlt: "#42594F",
   chalk: "#F4F1E8",
   accent: "#F2C14E",
   accent2: "#E8744A",
-  muted: "#9FB0A4",
-  border: "#46594F",
+  muted: "#8FA89E",
+  border: "#4E675D",
 };
 
 const DISPLAY_FONT = "'Yomogi', sans-serif";
@@ -322,7 +322,8 @@ const LS = {
 const NAV_ITEMS = [
   { page: "pantry",   label: "調味料棚",     icon: Soup },
   { page: "shopping", label: "買い物リスト",  icon: ShoppingCart },
-  { page: "history",  label: "履歴",          icon: History },
+  { page: "history",  label: "履歴",          icon: History,      tab: "list" },
+  { page: "history",  label: "カレンダー",    icon: CalendarDays, tab: "calendar" },
   { page: "data",     label: "データ管理",    icon: HardDrive },
 ];
 
@@ -538,7 +539,11 @@ export default function FridgeMenuApp() {
     setHistory((prev) => prev.map((h) => h.uid === uid ? { ...h, photo: resized } : h));
   };
 
-  const navigate = (page) => { setCurrentPage(page); setSideMenuOpen(false); };
+  const navigate = (page, tab) => {
+    setCurrentPage(page);
+    if (tab) { setHistoryView(tab); setSelectedDay(null); }
+    setSideMenuOpen(false);
+  };
 
   const exportData = () => {
     const data = {
@@ -753,14 +758,14 @@ export default function FridgeMenuApp() {
           </button>
           <div style={{ height: "1px", backgroundColor: COLORS.border, margin: "0.5rem 0 0.75rem" }} />
 
-          {NAV_ITEMS.map(({ page, label, icon: Icon }) => {
+          {NAV_ITEMS.map(({ page, label, icon: Icon, tab }) => {
             const badge =
               page === "pantry" ? `${pantry.size}種類` :
               page === "shopping" && shoppingList.length > 0 ? `${shoppingList.length}件` :
-              page === "history" && history.length > 0 ? `${history.length}件` : null;
-            const active = currentPage === page;
+              page === "history" && tab === "list" && history.length > 0 ? `${history.length}件` : null;
+            const active = currentPage === page && (!tab || historyView === tab);
             return (
-              <button key={page} onClick={() => navigate(page)}
+              <button key={label} onClick={() => navigate(page, tab)}
                 className="chalk-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 text-sm font-bold"
                 style={{
                   backgroundColor: active ? COLORS.surfaceAlt : "transparent",
@@ -1111,42 +1116,6 @@ export default function FridgeMenuApp() {
                           </span>
                         </div>
 
-                        {/* 評価ボタン */}
-                        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                          {[
-                            { type: "good", icon: "👍", label: "おいしかった" },
-                            { type: "bad",  icon: "👎", label: "微妙" },
-                          ].map(({ type, icon, label }) => {
-                            const isSelected = myRating === type;
-                            const isDisabled = !!myRating && !isSelected;
-                            return (
-                              <button key={type}
-                                onClick={() => rateRecipe(recipe.id, type)}
-                                disabled={isDisabled}
-                                className="chalk-btn"
-                                style={{
-                                  backgroundColor: isSelected ? "rgba(242,193,78,0.9)" : "rgba(0,0,0,0.25)",
-                                  border: isSelected ? "2px solid rgba(242,193,78,1)" : "1px solid rgba(255,255,255,0.2)",
-                                  borderRadius: "999px",
-                                  padding: "0.3rem 0.85rem",
-                                  color: isSelected ? "#1a2420" : isDisabled ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.85)",
-                                  display: "flex", alignItems: "center", gap: "0.3rem",
-                                  fontSize: "0.8rem",
-                                  cursor: isDisabled ? "not-allowed" : "pointer",
-                                  opacity: isDisabled ? 0.45 : 1,
-                                  fontWeight: isSelected ? 700 : 400,
-                                }}>
-                                <span>{icon}</span>
-                                <span style={{ fontSize: "0.75rem" }}>{label}</span>
-                              </button>
-                            );
-                          })}
-                          {myRating && (
-                            <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.45)", fontFamily: MONO_FONT }}>
-                              自分の評価: {myRating === "good" ? "👍" : "👎"}
-                            </span>
-                          )}
-                        </div>
                         {photo && (
                           <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>
                             Photo by{" "}
@@ -1163,9 +1132,9 @@ export default function FridgeMenuApp() {
                       </div>
 
                       {/* カードボディ */}
-                      <div style={{ backgroundColor: COLORS.surface, padding: "1rem 1.25rem 1.25rem" }}>
-                        <div className="mb-2">
-                          <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>
+                      <div style={{ backgroundColor: COLORS.surface, padding: "1.25rem 1.25rem 1.5rem" }}>
+                        <div className="mb-3">
+                          <p className="text-xs mb-2" style={{ color: COLORS.muted }}>
                             必要な食材({servings}人前)。足りないものはタップで買い物リストへ
                           </p>
                           <div className="flex flex-wrap gap-1.5">
@@ -1229,6 +1198,38 @@ export default function FridgeMenuApp() {
                             <CheckCircle2 size={15} />
                             {made ? "作った!" : "これ作った"}
                           </button>
+                        </div>
+
+                        {/* 評価ボタン */}
+                        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.65rem" }}>
+                          {[
+                            { type: "good", icon: "👍", label: "おいしかった", activeColor: COLORS.accent, activeText: COLORS.bg },
+                            { type: "bad",  icon: "👎", label: "微妙",         activeColor: COLORS.accent2, activeText: "#fff" },
+                          ].map(({ type, icon, label, activeColor, activeText }) => {
+                            const isSelected = myRating === type;
+                            const isDisabled = !!myRating && !isSelected;
+                            return (
+                              <button key={type}
+                                onClick={() => rateRecipe(recipe.id, type)}
+                                disabled={isDisabled}
+                                className="chalk-btn flex-1"
+                                style={{
+                                  padding: "0.45rem 0",
+                                  borderRadius: "0.5rem",
+                                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem",
+                                  backgroundColor: isSelected ? activeColor : COLORS.surfaceAlt,
+                                  color: isSelected ? activeText : isDisabled ? COLORS.border : COLORS.muted,
+                                  border: isSelected ? "none" : `1px solid ${isDisabled ? "transparent" : COLORS.border}`,
+                                  fontSize: "0.8rem",
+                                  fontWeight: isSelected ? 700 : 400,
+                                  opacity: isDisabled ? 0.4 : 1,
+                                  cursor: isDisabled ? "not-allowed" : "pointer",
+                                }}>
+                                <span>{icon}</span>
+                                <span>{label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
 
                         {open && (
@@ -1394,38 +1395,6 @@ export default function FridgeMenuApp() {
                                 </span>
                               </div>
 
-                              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                                {[{ type: "good", icon: "👍", label: "おいしかった" }, { type: "bad", icon: "👎", label: "微妙" }].map(({ type, icon, label }) => {
-                                  const isSelected = myRating === type;
-                                  const isDisabled = !!myRating && !isSelected;
-                                  return (
-                                    <button key={type}
-                                      onClick={() => rateRecipe(recipe.id, type)}
-                                      disabled={isDisabled}
-                                      className="chalk-btn"
-                                      style={{
-                                        backgroundColor: isSelected ? "rgba(242,193,78,0.9)" : "rgba(0,0,0,0.25)",
-                                        border: isSelected ? "2px solid rgba(242,193,78,1)" : "1px solid rgba(255,255,255,0.2)",
-                                        borderRadius: "999px",
-                                        padding: "0.3rem 0.85rem",
-                                        color: isSelected ? "#1a2420" : isDisabled ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.85)",
-                                        display: "flex", alignItems: "center", gap: "0.3rem",
-                                        fontSize: "0.8rem",
-                                        cursor: isDisabled ? "not-allowed" : "pointer",
-                                        opacity: isDisabled ? 0.45 : 1,
-                                        fontWeight: isSelected ? 700 : 400,
-                                      }}>
-                                      <span>{icon}</span>
-                                      <span style={{ fontSize: "0.75rem" }}>{label}</span>
-                                    </button>
-                                  );
-                                })}
-                                {myRating && (
-                                  <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.45)", fontFamily: MONO_FONT }}>
-                                    自分の評価: {myRating === "good" ? "👍" : "👎"}
-                                  </span>
-                                )}
-                              </div>
                               {photo && (
                                 <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>
                                   Photo by{" "}
@@ -1500,6 +1469,38 @@ export default function FridgeMenuApp() {
                                   <CheckCircle2 size={15} />
                                   {made ? "作った!" : "これ作った"}
                                 </button>
+                              </div>
+
+                              {/* 評価ボタン */}
+                              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.65rem" }}>
+                                {[
+                                  { type: "good", icon: "👍", label: "おいしかった", activeColor: COLORS.accent, activeText: COLORS.bg },
+                                  { type: "bad",  icon: "👎", label: "微妙",         activeColor: COLORS.accent2, activeText: "#fff" },
+                                ].map(({ type, icon, label, activeColor, activeText }) => {
+                                  const isSelected = myRating === type;
+                                  const isDisabled = !!myRating && !isSelected;
+                                  return (
+                                    <button key={type}
+                                      onClick={() => rateRecipe(recipe.id, type)}
+                                      disabled={isDisabled}
+                                      className="chalk-btn flex-1"
+                                      style={{
+                                        padding: "0.45rem 0",
+                                        borderRadius: "0.5rem",
+                                        display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem",
+                                        backgroundColor: isSelected ? activeColor : COLORS.surfaceAlt,
+                                        color: isSelected ? activeText : isDisabled ? COLORS.border : COLORS.muted,
+                                        border: isSelected ? "none" : `1px solid ${isDisabled ? "transparent" : COLORS.border}`,
+                                        fontSize: "0.8rem",
+                                        fontWeight: isSelected ? 700 : 400,
+                                        opacity: isDisabled ? 0.4 : 1,
+                                        cursor: isDisabled ? "not-allowed" : "pointer",
+                                      }}>
+                                      <span>{icon}</span>
+                                      <span>{label}</span>
+                                    </button>
+                                  );
+                                })}
                               </div>
 
                               {open && (

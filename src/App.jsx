@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
+  Trash2, Camera, ImageOff,
 } from "lucide-react";
 
 const COLORS = {
@@ -291,9 +292,10 @@ export default function FridgeMenuApp() {
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
-  const [history, setHistory] = useState(() =>
-    LS.get("history", []).map((h) => ({ ...h, at: new Date(h.at) }))
-  );
+  const [history, setHistory] = useState(() => {
+    let t = 0;
+    return LS.get("history", []).map((h) => ({ ...h, uid: h.uid ?? --t, at: new Date(h.at) }));
+  });
   const [shoppingList, setShoppingList] = useState(() => LS.get("shoppingList", []));
 
   useEffect(() => { LS.set("fridge", fridge); }, [fridge]);
@@ -377,6 +379,20 @@ export default function FridgeMenuApp() {
     const uid = Date.now();
     pendingUidRef.current = uid;
     setHistory((prev) => [...prev, { uid, id: recipe.id, name: recipe.name, at: new Date() }]);
+    fileInputRef.current?.click();
+  };
+
+  const deleteHistory = (uid) => {
+    if (!window.confirm("この履歴を削除しますか？")) return;
+    setHistory((prev) => prev.filter((h) => h.uid !== uid));
+  };
+
+  const deletePhoto = (uid) => {
+    setHistory((prev) => prev.map((h) => h.uid === uid ? { ...h, photo: undefined } : h));
+  };
+
+  const changePhoto = (uid) => {
+    pendingUidRef.current = uid;
     fileInputRef.current?.click();
   };
 
@@ -985,7 +1001,7 @@ export default function FridgeMenuApp() {
             </div>
             <div className="flex flex-col gap-1.5">
               {[...history].reverse().map((h, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                <div key={h.uid ?? i} className="flex items-center gap-2 px-3 py-2 rounded-lg"
                   style={{ backgroundColor: COLORS.surfaceAlt }}>
                   {h.photo ? (
                     <button onClick={() => setLightboxPhoto(h.photo)} className="flex-shrink-0"
@@ -1000,10 +1016,34 @@ export default function FridgeMenuApp() {
                       <span style={{ fontSize: "1rem" }}>🍽</span>
                     </div>
                   )}
-                  <span className="text-sm flex-1">{h.name}</span>
-                  <span className="text-xs flex-shrink-0" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
-                    {h.at.getMonth() + 1}/{h.at.getDate()} {String(h.at.getHours()).padStart(2, "0")}:{String(h.at.getMinutes()).padStart(2, "0")}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate">{h.name}</p>
+                    <p className="text-xs" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
+                      {h.at.getMonth() + 1}/{h.at.getDate()} {String(h.at.getHours()).padStart(2, "0")}:{String(h.at.getMinutes()).padStart(2, "0")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => changePhoto(h.uid)}
+                      className="chalk-btn flex items-center justify-center rounded-full"
+                      style={{ width: "1.8rem", height: "1.8rem", backgroundColor: COLORS.surface }}
+                      aria-label="写真を変更">
+                      <Camera size={13} style={{ color: COLORS.accent }} />
+                    </button>
+                    {h.photo && (
+                      <button onClick={() => deletePhoto(h.uid)}
+                        className="chalk-btn flex items-center justify-center rounded-full"
+                        style={{ width: "1.8rem", height: "1.8rem", backgroundColor: COLORS.surface }}
+                        aria-label="写真を削除">
+                        <ImageOff size={13} style={{ color: COLORS.muted }} />
+                      </button>
+                    )}
+                    <button onClick={() => deleteHistory(h.uid)}
+                      className="chalk-btn flex items-center justify-center rounded-full"
+                      style={{ width: "1.8rem", height: "1.8rem", backgroundColor: COLORS.surface }}
+                      aria-label="履歴を削除">
+                      <Trash2 size={13} style={{ color: COLORS.accent2 }} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

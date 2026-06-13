@@ -3,7 +3,7 @@ import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
   Trash2, Camera, ImageOff, Menu, ChevronLeft,
-  HardDrive, Download, Upload, Home,
+  HardDrive, Download, Upload, Home, Search,
 } from "lucide-react";
 
 const COLORS = {
@@ -325,6 +325,9 @@ export default function FridgeMenuApp() {
   const [ratings, setRatings] = useState(() => LS.get("ratings", {}));
   const [currentPage, setCurrentPage] = useState("main");
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
+  const [mainMode, setMainMode] = useState("fridge");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTags, setSearchTags] = useState(new Set());
 
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
@@ -394,6 +397,10 @@ export default function FridgeMenuApp() {
     setShoppingList((prev) =>
       prev.some((i) => i.text === text) ? prev : [...prev, { text, bought: false }]
     );
+  };
+
+  const addAllMissingToShopping = (details) => {
+    details.filter((d) => d.status !== "ok").forEach((d) => addToShoppingList(d.name));
   };
 
   const removeFromShoppingList = (text) => {
@@ -541,6 +548,36 @@ export default function FridgeMenuApp() {
       .filter((r) => (moodFilter && !karaito ? r.moods.includes(moodFilter) : true))
       .sort((a, b) => b.coverage - a.coverage || a.time - b.time);
   }, [fridge, pantry, servings, moodFilter, useSoon, history, ratings]);
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const factor = servings / 2;
+    return RECIPES
+      .filter((r) => {
+        if (q) {
+          const nameMatch = r.name.toLowerCase().includes(q);
+          const ingMatch = r.ingredients.some((i) => i.name.toLowerCase().includes(q));
+          if (!nameMatch && !ingMatch) return false;
+        }
+        if (searchTags.size > 0) {
+          const ingNames = new Set(r.ingredients.map((i) => i.name));
+          if (![...searchTags].some((t) => ingNames.has(t))) return false;
+        }
+        return true;
+      })
+      .map((r) => {
+        const details = r.ingredients.map((ing) => {
+          const required = Math.max(1, Math.round(ing.amount * factor));
+          const have = fridge[ing.name] || 0;
+          let status;
+          if (have <= 0) status = "missing";
+          else if (have >= required) status = "ok";
+          else status = "insufficient";
+          return { ...ing, have, required, status };
+        });
+        return { ...r, details, displayKcal: Math.round(r.kcal * factor) };
+      });
+  }, [searchQuery, searchTags, fridge, servings]);
 
   const pageSize = 3;
   const totalPages = Math.max(1, Math.ceil(sortedRecipes.length / pageSize));
@@ -710,6 +747,28 @@ export default function FridgeMenuApp() {
                 冷蔵庫の中身を選ぶだけ。あとはおまかせ。
               </p>
             </header>
+
+            {/* モード切り替えトグル */}
+            <div style={{ display: "flex", backgroundColor: COLORS.surface, borderRadius: "0.75rem", border: `1px solid ${COLORS.border}`, padding: "0.25rem", marginBottom: "1.5rem" }}>
+              {[
+                { mode: "fridge", icon: "🧊", label: "冷蔵庫モード" },
+                { mode: "search", icon: "🔍", label: "レシピを探す" },
+              ].map(({ mode, icon, label }) => (
+                <button key={mode} onClick={() => setMainMode(mode)} className="chalk-btn flex-1"
+                  style={{
+                    padding: "0.6rem 0.5rem", borderRadius: "0.5rem",
+                    backgroundColor: mainMode === mode ? COLORS.accent : "transparent",
+                    color: mainMode === mode ? COLORS.bg : COLORS.muted,
+                    fontWeight: mainMode === mode ? 700 : 400,
+                    fontSize: "0.85rem",
+                    transition: "background-color 0.2s ease, color 0.2s ease",
+                  }}>
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+
+            {mainMode === "fridge" && (<>
 
             {/* 人数 */}
             <section className="mb-6">
@@ -1103,6 +1162,214 @@ export default function FridgeMenuApp() {
                   食材を増やすか、きぶんフィルターを外してみて。
                 </p>
               </section>
+            )}
+            </>)}
+
+            {/* ── SEARCH MODE ── */}
+            {mainMode === "search" && (
+              <div className="mb-8">
+                {/* 検索入力 */}
+                <div className="mb-5">
+                  <div style={{ position: "relative", marginBottom: "0.75rem" }}>
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="レシピ名・食材名で検索…"
+                      className="w-full rounded-xl text-sm outline-none"
+                      style={{
+                        backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
+                        color: COLORS.chalk, fontFamily: BODY_FONT,
+                        padding: "0.65rem 2.5rem 0.65rem 2.75rem",
+                      }}
+                    />
+                    <Search size={15} style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: COLORS.muted, pointerEvents: "none" }} />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery("")} className="chalk-btn"
+                        style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)" }}>
+                        <X size={14} style={{ color: COLORS.muted }} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 食材タグ */}
+                  <p className="text-xs mb-2" style={{ color: COLORS.muted }}>食材で絞り込む</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ALL_INGREDIENTS.map((ing) => {
+                      const active = searchTags.has(ing);
+                      return (
+                        <button key={ing} onClick={() => setSearchTags((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(ing)) next.delete(ing); else next.add(ing);
+                          return next;
+                        })}
+                          className="chip chalk-btn px-3 py-1 rounded-full text-xs border"
+                          style={{
+                            backgroundColor: active ? COLORS.accent : "transparent",
+                            color: active ? COLORS.bg : COLORS.chalk,
+                            borderColor: active ? COLORS.accent : COLORS.border,
+                            fontWeight: active ? 700 : 400,
+                          }}>
+                          {ing}
+                        </button>
+                      );
+                    })}
+                    {searchTags.size > 0 && (
+                      <button onClick={() => setSearchTags(new Set())}
+                        className="chip chalk-btn px-3 py-1 rounded-full text-xs border flex items-center gap-1"
+                        style={{ color: COLORS.accent2, borderColor: COLORS.accent2 }}>
+                        <X size={10} />クリア
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 検索結果 */}
+                {searchQuery === "" && searchTags.size === 0 ? (
+                  <p className="text-sm text-center py-10" style={{ color: COLORS.muted }}>
+                    検索ワードを入力するか、<br />上の食材タグを選んでください
+                  </p>
+                ) : searchResults.length === 0 ? (
+                  <p className="text-sm text-center py-10" style={{ color: COLORS.muted }}>
+                    条件に合うレシピが見つかりませんでした
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-xs mb-3" style={{ color: COLORS.muted }}>{searchResults.length}件のレシピ</p>
+                    <div className="flex flex-col gap-4">
+                      {searchResults.map((recipe) => {
+                        const open = !!expandedSteps[recipe.id];
+                        const made = history.some((h) => h.id === recipe.id);
+                        const emoji = RECIPE_EMOJIS[recipe.id] || "🍽️";
+                        const gradient = CARD_GRADIENTS[recipe.id % CARD_GRADIENTS.length];
+                        const recipeRating = ratings[recipe.id] || { good: 0, bad: 0 };
+                        const missingDetails = recipe.details.filter((d) => d.status !== "ok");
+                        return (
+                          <section key={recipe.id} className="fade-up rounded-2xl overflow-hidden"
+                            style={{ border: `2px solid ${COLORS.border}` }}>
+
+                            {/* カラーヘッダー */}
+                            <div style={{ background: gradient, padding: "1.25rem", position: "relative", overflow: "hidden" }}>
+                              <div aria-hidden="true" style={{ position: "absolute", right: "-0.25rem", top: "-0.75rem", fontSize: "7rem", lineHeight: 1, opacity: 0.1, pointerEvents: "none", userSelect: "none" }}>{emoji}</div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative", marginBottom: "0.75rem" }}>
+                                <span style={{ fontSize: "3rem", lineHeight: 1, flexShrink: 0 }}>{emoji}</span>
+                                <h3 style={{ fontFamily: DISPLAY_FONT, fontSize: "1.5rem", color: "#fff", lineHeight: 1.2 }}>{recipe.name}</h3>
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative", marginBottom: "0.75rem" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                  <Flame size={14} style={{ color: COLORS.accent2 }} />
+                                  <span style={{ fontFamily: MONO_FONT, fontSize: "0.85rem", color: COLORS.accent2, fontWeight: 700 }}>約{recipe.displayKcal}kcal</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                  <Clock size={14} style={{ color: COLORS.accent }} />
+                                  <span style={{ fontFamily: MONO_FONT, fontSize: "0.85rem", color: COLORS.accent, fontWeight: 700 }}>約{recipe.time}分</span>
+                                </div>
+                                <span style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.5)" }}>
+                                  {recipe.moods.map((m) => MOODS.find((x) => x.key === m)?.label).join("・")}
+                                </span>
+                              </div>
+
+                              <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
+                                {[{ type: "good", icon: "👍", label: "おいしかった" }, { type: "bad", icon: "👎", label: "微妙" }].map(({ type, icon, label }) => {
+                                  const count = recipeRating[type] || 0;
+                                  return (
+                                    <button key={type} onClick={() => rateRecipe(recipe.id, type)} className="chalk-btn"
+                                      style={{ backgroundColor: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "999px", padding: "0.3rem 0.85rem", color: "rgba(255,255,255,0.85)", display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.8rem" }}>
+                                      <span>{icon}</span>
+                                      <span style={{ fontSize: "0.75rem" }}>{label}</span>
+                                      {count > 0 && <span style={{ fontFamily: MONO_FONT, fontSize: "0.7rem", opacity: 0.65 }}>×{count}</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* ボディ */}
+                            <div style={{ backgroundColor: COLORS.surface, padding: "1rem 1.25rem 1.25rem" }}>
+                              <div className="mb-2">
+                                <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>必要な食材({servings}人前)</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {recipe.details.map((d) => {
+                                    let bg = COLORS.surfaceAlt, color = COLORS.muted, border = "none";
+                                    if (d.status === "ok") { bg = COLORS.accent; color = COLORS.bg; }
+                                    else if (d.status === "insufficient") { bg = "transparent"; color = COLORS.accent2; border = `1px solid ${COLORS.accent2}`; }
+                                    else { bg = "transparent"; color = COLORS.muted; border = `1px solid ${COLORS.border}`; }
+                                    const unit = UNITS[d.name] || "";
+                                    return (
+                                      <span key={d.name} className="px-2.5 py-1 rounded-full text-xs"
+                                        style={{ backgroundColor: bg, color, border, fontFamily: BODY_FONT }}>
+                                        {d.name} {d.required}{unit}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {recipe.seasonings.length > 0 && (
+                                <div className="mb-3">
+                                  <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>使う調味料</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {recipe.seasonings.map((s) => {
+                                      const has = pantry.has(s);
+                                      return (
+                                        <span key={s} className="px-2.5 py-1 rounded-full text-xs"
+                                          style={{ backgroundColor: has ? COLORS.surfaceAlt : "transparent", color: has ? COLORS.chalk : COLORS.accent2, border: has ? "none" : `1px solid ${COLORS.accent2}`, fontFamily: BODY_FONT }}>
+                                          {has ? s : `${s} ✕なし`}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {missingDetails.length > 0 && (
+                                <button onClick={() => addAllMissingToShopping(recipe.details)}
+                                  className="chalk-btn w-full py-2 rounded-lg text-sm flex items-center justify-center gap-1.5 mb-3"
+                                  style={{ backgroundColor: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}`, color: COLORS.chalk }}>
+                                  <ShoppingCart size={14} />
+                                  足りない食材をまとめて買い物リストへ ({missingDetails.length}件)
+                                </button>
+                              )}
+
+                              <div className="flex gap-2">
+                                <button onClick={() => toggleSteps(recipe.id)}
+                                  className="chalk-btn flex-1 py-2.5 rounded-lg text-sm font-bold"
+                                  style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk }}>
+                                  {open ? "作り方を閉じる" : "作り方を見る"}
+                                </button>
+                                <button onClick={() => markAsMade(recipe)}
+                                  className="chalk-btn flex-1 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5"
+                                  style={{ backgroundColor: made ? COLORS.accent : "transparent", color: made ? COLORS.bg : COLORS.accent, border: made ? "none" : `1px solid ${COLORS.accent}` }}>
+                                  <CheckCircle2 size={15} />
+                                  {made ? "作った!" : "これ作った"}
+                                </button>
+                              </div>
+
+                              {open && (
+                                <>
+                                  <p className="text-xs mt-3 mb-2" style={{ color: COLORS.muted }}>※分量は2人前基準。人数に合わせて調整してね</p>
+                                  <ol className="mb-2 space-y-2">
+                                    {recipe.steps.map((step, idx) => (
+                                      <li key={idx} className="flex gap-2.5 text-sm" style={{ color: COLORS.chalk }}>
+                                        <span className="flex-shrink-0 flex items-center justify-center rounded-full"
+                                          style={{ width: "1.4rem", height: "1.4rem", backgroundColor: COLORS.accent, color: COLORS.bg, fontFamily: MONO_FONT, fontSize: "0.7rem", fontWeight: 700 }}>
+                                          {idx + 1}
+                                        </span>
+                                        <span className="leading-relaxed">{step}</span>
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </>
+                              )}
+                            </div>
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </>
         )}

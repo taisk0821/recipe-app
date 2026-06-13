@@ -67,7 +67,7 @@ const RECIPE_SEARCH_TERMS = {
   15: "fried rice egg green onion",
 };
 
-const UNSPLASH_CACHE_KEY = "unsplash_cache_v2";
+const UNSPLASH_CACHE_KEY = "unsplash_cache_v3";
 const UNSPLASH_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 const UNITS = {
@@ -385,7 +385,12 @@ export default function FridgeMenuApp() {
             const data = await res.json();
             const photo = data.results?.[0];
             if (!photo?.urls?.small) return null;
-            return [id, { url: photo.urls.small, photographer: photo.user.name }];
+            return [id, {
+              url: photo.urls.small,
+              photographer: photo.user.name,
+              photographerUrl: `${photo.user.links.html}?utm_source=kyou_no_gohan&utm_medium=referral`,
+              unsplashUrl: `${photo.links.html}?utm_source=kyou_no_gohan&utm_medium=referral`,
+            }];
           } catch {
             return null;
           }
@@ -1109,7 +1114,15 @@ export default function FridgeMenuApp() {
                         </div>
                         {photo && (
                           <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>
-                            📷 {photo.photographer} / Unsplash
+                            Photo by{" "}
+                            <a href={photo.photographerUrl} target="_blank" rel="noopener noreferrer"
+                              style={{ color: "rgba(255,255,255,0.65)", textDecoration: "underline" }}>
+                              {photo.photographer}
+                            </a>{" "}on{" "}
+                            <a href={`https://unsplash.com/?utm_source=kyou_no_gohan&utm_medium=referral`} target="_blank" rel="noopener noreferrer"
+                              style={{ color: "rgba(255,255,255,0.65)", textDecoration: "underline" }}>
+                              Unsplash
+                            </a>
                           </p>
                         )}
                       </div>
@@ -1361,7 +1374,15 @@ export default function FridgeMenuApp() {
                               </div>
                               {photo && (
                                 <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>
-                                  📷 {photo.photographer} / Unsplash
+                                  Photo by{" "}
+                                  <a href={photo.photographerUrl} target="_blank" rel="noopener noreferrer"
+                                    style={{ color: "rgba(255,255,255,0.65)", textDecoration: "underline" }}>
+                                    {photo.photographer}
+                                  </a>{" "}on{" "}
+                                  <a href={`https://unsplash.com/?utm_source=kyou_no_gohan&utm_medium=referral`} target="_blank" rel="noopener noreferrer"
+                                    style={{ color: "rgba(255,255,255,0.65)", textDecoration: "underline" }}>
+                                    Unsplash
+                                  </a>
                                 </p>
                               )}
                             </div>

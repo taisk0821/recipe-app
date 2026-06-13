@@ -300,6 +300,8 @@ export default function FridgeMenuApp() {
     return LS.get("history", []).map((h) => ({ ...h, uid: h.uid ?? --t, at: new Date(h.at) }));
   });
   const [shoppingList, setShoppingList] = useState(() => LS.get("shoppingList", []));
+  const [shoppingInput, setShoppingInput] = useState("");
+  const [shoppingMemo, setShoppingMemo] = useState(() => LS.get("shoppingMemo", ""));
   const [currentPage, setCurrentPage] = useState("main");
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
 
@@ -311,6 +313,7 @@ export default function FridgeMenuApp() {
   useEffect(() => { LS.set("servings", servings); }, [servings]);
   useEffect(() => { LS.set("history", history.map((h) => ({ ...h, at: h.at.toISOString() }))); }, [history]);
   useEffect(() => { LS.set("shoppingList", shoppingList); }, [shoppingList]);
+  useEffect(() => { LS.set("shoppingMemo", shoppingMemo); }, [shoppingMemo]);
 
   const selectedNames = Object.keys(fridge);
   const recentIds = new Set(history.slice(-3).map((h) => h.id));
@@ -370,6 +373,14 @@ export default function FridgeMenuApp() {
 
   const removeFromShoppingList = (item) => {
     setShoppingList((prev) => prev.filter((i) => i !== item));
+  };
+
+  const addShoppingItem = () => {
+    const value = shoppingInput.trim();
+    if (value && !shoppingList.includes(value)) {
+      setShoppingList((prev) => [...prev, value]);
+    }
+    setShoppingInput("");
   };
 
   const markAsMade = (recipe) => {
@@ -961,12 +972,30 @@ export default function FridgeMenuApp() {
               <ShoppingCart size={20} style={{ color: COLORS.accent }} />
               <h1 style={{ fontFamily: DISPLAY_FONT, fontSize: "2rem", color: COLORS.chalk }}>買い物リスト</h1>
             </div>
+
+            {/* 手動追加入力 */}
+            <div className="flex gap-2 mb-4">
+              <input value={shoppingInput}
+                onChange={(e) => setShoppingInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addShoppingItem()}
+                placeholder="追加したいものを入力"
+                className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.chalk, fontFamily: BODY_FONT }} />
+              <button onClick={addShoppingItem}
+                className="chalk-btn px-3 py-2 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}` }}
+                aria-label="リストに追加">
+                <Plus size={18} style={{ color: COLORS.chalk }} />
+              </button>
+            </div>
+
+            {/* リスト */}
             {shoppingList.length === 0 ? (
-              <p className="text-sm" style={{ color: COLORS.muted }}>
-                リストは空です。レシピ画面で足りない食材・調味料をタップすると追加されます。
+              <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
+                リストは空です。上の入力欄から追加するか、レシピ画面で足りない食材・調味料をタップしてください。
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 mb-6">
                 {shoppingList.map((item) => (
                   <div key={item} className="flex items-center justify-between px-4 py-3 rounded-xl"
                     style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
@@ -979,6 +1008,21 @@ export default function FridgeMenuApp() {
                 ))}
               </div>
             )}
+
+            {/* フリーメモ */}
+            <div>
+              <p className="text-xs mb-2" style={{ color: COLORS.muted }}>メモ</p>
+              <textarea
+                value={shoppingMemo}
+                onChange={(e) => setShoppingMemo(e.target.value)}
+                placeholder="自由にメモを書けます"
+                rows={5}
+                className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
+                style={{
+                  backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
+                  color: COLORS.chalk, fontFamily: BODY_FONT, lineHeight: 1.7,
+                }} />
+            </div>
           </>
         )}
 

@@ -3,7 +3,7 @@ import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
   Trash2, Camera, ImageOff, Menu, ChevronLeft,
-  HardDrive, Download, Upload,
+  HardDrive, Download, Upload, Home,
 } from "lucide-react";
 
 const COLORS = {
@@ -585,6 +585,20 @@ export default function FridgeMenuApp() {
           <p style={{ color: COLORS.muted, fontFamily: MONO_FONT, fontSize: "0.7rem", letterSpacing: "0.18em", marginBottom: "1.25rem" }}>
             MENU
           </p>
+
+          {/* ホームへ戻る */}
+          <button onClick={() => navigate("main")}
+            className="chalk-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 text-sm font-bold"
+            style={{
+              backgroundColor: currentPage === "main" ? COLORS.surfaceAlt : "transparent",
+              color: currentPage === "main" ? COLORS.accent : COLORS.chalk,
+              textAlign: "left",
+            }}>
+            <Home size={17} style={{ color: currentPage === "main" ? COLORS.accent : COLORS.muted, flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>ホーム</span>
+          </button>
+          <div style={{ height: "1px", backgroundColor: COLORS.border, margin: "0.5rem 0 0.75rem" }} />
+
           {NAV_ITEMS.map(({ page, label, icon: Icon }) => {
             const badge =
               page === "pantry" ? `${pantry.size}種類` :
@@ -609,6 +623,23 @@ export default function FridgeMenuApp() {
           })}
         </div>
       </nav>
+
+      {/* Back button — fixed top-left (sub-pages only) */}
+      {currentPage !== "main" && (
+        <button onClick={() => setCurrentPage("main")}
+          className="chalk-btn"
+          aria-label="ホームに戻る"
+          style={{
+            position: "fixed", top: "1.1rem", left: "1.1rem", zIndex: 45,
+            height: "2.4rem", padding: "0 0.75rem",
+            backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
+            borderRadius: "0.6rem",
+            display: "flex", alignItems: "center", gap: "0.2rem",
+          }}>
+          <ChevronLeft size={16} style={{ color: COLORS.chalk }} />
+          <span style={{ fontSize: "0.8rem", color: COLORS.chalk, fontFamily: BODY_FONT }}>ホーム</span>
+        </button>
+      )}
 
       {/* Hamburger — fixed top-right */}
       <button onClick={() => setSideMenuOpen(true)}

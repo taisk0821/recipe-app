@@ -1,22 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background -->
   <rect width="512" height="512" fill="#283831"/>
+  <defs>
+    <!-- 茶碗は y=268 より下のみ表示 -->
+    <clipPath id="bowlClip">
+      <rect x="0" y="268" width="512" height="244"/>
+    </clipPath>
+    <!-- ご飯は y=268 より上のみ表示 -->
+    <clipPath id="riceClip">
+      <rect x="0" y="0" width="512" height="268"/>
+    </clipPath>
+  </defs>
 
-  <!-- Steam (left) -->
-  <path d="M204 192 C204 164 228 164 228 136 C228 108 204 108 204 80"
-    stroke="#F4F1E8" stroke-width="13" fill="none" stroke-linecap="round" opacity="0.65"/>
-  <!-- Steam (right) -->
-  <path d="M308 192 C308 164 332 164 332 136 C332 108 308 108 308 80"
-    stroke="#F4F1E8" stroke-width="13" fill="none" stroke-linecap="round" opacity="0.65"/>
+  <!-- 茶碗（楕円の下半分） -->
+  <ellipse cx="256" cy="268" rx="158" ry="170"
+    fill="#F2C14E" clip-path="url(#bowlClip)"/>
 
-  <!-- Rice dome -->
-  <path d="M108 276 C108 164 404 164 404 276 Z" fill="#F4F1E8"/>
+  <!-- ご飯（楕円の上半分） -->
+  <ellipse cx="256" cy="268" rx="142" ry="110"
+    fill="#F4F1E8" clip-path="url(#riceClip)"/>
 
-  <!-- Bowl rim -->
-  <rect x="104" y="268" width="304" height="32" rx="16" fill="#F2C14E"/>
+  <!-- ご飯のつや（ハイライト） -->
+  <ellipse cx="220" cy="228" rx="48" ry="22"
+    fill="white" opacity="0.18" transform="rotate(-18 220 228)"/>
 
-  <!-- Bowl body -->
-  <path d="M120 300 Q256 424 392 300 Z" fill="#F2C14E"/>
-  <!-- Bowl inner shading -->
-  <path d="M150 300 Q256 402 362 300 Z" fill="#E8744A" opacity="0.75"/>
+  <!-- 茶碗のリム（縦長楕円でひと回り大きく） -->
+  <ellipse cx="256" cy="268" rx="164" ry="22" fill="#D9A730"/>
 </svg>

@@ -283,6 +283,13 @@ const RECIPES = [
 
 const isQuantifiable = (name) => Object.prototype.hasOwnProperty.call(DEFAULT_QTY, name);
 
+const formatDayKey = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 const resizeImage = (file, maxWidth, quality) =>
   new Promise((resolve) => {
     const img = new Image();
@@ -354,6 +361,12 @@ export default function FridgeMenuApp() {
     if (cached && Date.now() - cached.fetchedAt < UNSPLASH_CACHE_TTL) return cached.images;
     return {};
   });
+  const [historyView, setHistoryView] = useState("list");
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedDay, setSelectedDay] = useState(null);
 
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
@@ -640,6 +653,16 @@ export default function FridgeMenuApp() {
         return { ...r, details, displayKcal: Math.round(r.kcal * factor) };
       });
   }, [searchQuery, searchTags, fridge, servings]);
+
+  const historyByDay = useMemo(() => {
+    const map = {};
+    history.forEach((h) => {
+      const key = formatDayKey(h.at);
+      if (!map[key]) map[key] = [];
+      map[key].push(h);
+    });
+    return map;
+  }, [history]);
 
   const pageSize = 3;
   const totalPages = Math.max(1, Math.ceil(sortedRecipes.length / pageSize));
@@ -1616,48 +1639,240 @@ export default function FridgeMenuApp() {
         {/* ── HISTORY ── */}
         {currentPage === "history" && (
           <>
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center gap-2 mb-4">
               <History size={20} style={{ color: COLORS.accent }} />
               <h1 style={{ fontFamily: DISPLAY_FONT, fontSize: "2rem", color: COLORS.chalk }}>作ったごはんの記録</h1>
             </div>
-            {history.length === 0 ? (
-              <p className="text-sm" style={{ color: COLORS.muted }}>
-                まだ記録がありません。レシピ画面で「これ作った」を押すと記録されます。
-              </p>
-            ) : (
-              <>
-                <div className="flex flex-col gap-2">
-                  {[...history].reverse().map((h, i) => (
-                    <div key={h.uid ?? i} className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                      style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-                      {h.photo ? (
-                        <button onClick={() => setLightboxPhoto(h.photo)} className="flex-shrink-0" aria-label="写真を拡大表示">
-                          <img src={h.photo} alt={h.name}
-                            style={{ width: "2.8rem", height: "2.8rem", objectFit: "cover", borderRadius: "0.4rem" }} />
-                        </button>
-                      ) : (
-                        <div className="flex-shrink-0"
-                          style={{ width: "2.8rem", height: "2.8rem", borderRadius: "0.4rem", backgroundColor: COLORS.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <span style={{ fontSize: "1.1rem" }}>🍽</span>
+
+            {/* 表示切り替えタブ */}
+            <div style={{ display: "flex", backgroundColor: COLORS.surface, borderRadius: "0.75rem", border: `1px solid ${COLORS.border}`, padding: "0.25rem", marginBottom: "1.25rem" }}>
+              {[
+                { view: "list", label: "📋 リスト" },
+                { view: "calendar", label: "📅 カレンダー" },
+              ].map(({ view, label }) => (
+                <button key={view}
+                  onClick={() => { setHistoryView(view); setSelectedDay(null); }}
+                  className="chalk-btn flex-1"
+                  style={{
+                    padding: "0.55rem 0.5rem",
+                    borderRadius: "0.5rem",
+                    backgroundColor: historyView === view ? COLORS.accent : "transparent",
+                    color: historyView === view ? COLORS.bg : COLORS.muted,
+                    fontWeight: historyView === view ? 700 : 400,
+                    fontSize: "0.85rem",
+                    transition: "background-color 0.2s ease, color 0.2s ease",
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* ── リスト表示 ── */}
+            {historyView === "list" && (
+              history.length === 0 ? (
+                <p className="text-sm" style={{ color: COLORS.muted }}>
+                  まだ記録がありません。レシピ画面で「これ作った」を押すと記録されます。
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2">
+                    {[...history].reverse().map((h, i) => (
+                      <div key={h.uid ?? i} className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                        style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+                        {h.photo ? (
+                          <button onClick={() => setLightboxPhoto(h.photo)} className="flex-shrink-0" aria-label="写真を拡大表示">
+                            <img src={h.photo} alt={h.name}
+                              style={{ width: "2.8rem", height: "2.8rem", objectFit: "cover", borderRadius: "0.4rem" }} />
+                          </button>
+                        ) : (
+                          <div className="flex-shrink-0"
+                            style={{ width: "2.8rem", height: "2.8rem", borderRadius: "0.4rem", backgroundColor: COLORS.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <span style={{ fontSize: "1.1rem" }}>🍽</span>
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p className="text-sm truncate">{h.name}</p>
+                          <p className="text-xs" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
+                            {h.at.getMonth() + 1}/{h.at.getDate()} {String(h.at.getHours()).padStart(2, "0")}:{String(h.at.getMinutes()).padStart(2, "0")}
+                          </p>
                         </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p className="text-sm truncate">{h.name}</p>
-                        <p className="text-xs" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
-                          {h.at.getMonth() + 1}/{h.at.getDate()} {String(h.at.getHours()).padStart(2, "0")}:{String(h.at.getMinutes()).padStart(2, "0")}
-                        </p>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {iconBtn("写真を変更", () => changePhoto(h.uid), Camera, COLORS.accent)}
+                          {h.photo && iconBtn("写真を削除", () => deletePhoto(h.uid), ImageOff, COLORS.muted)}
+                          {iconBtn("履歴を削除", () => deleteHistory(h.uid), Trash2, COLORS.accent2)}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {iconBtn("写真を変更", () => changePhoto(h.uid), Camera, COLORS.accent)}
-                        {h.photo && iconBtn("写真を削除", () => deletePhoto(h.uid), ImageOff, COLORS.muted)}
-                        {iconBtn("履歴を削除", () => deleteHistory(h.uid), Trash2, COLORS.accent2)}
-                      </div>
-                    </div>
+                    ))}
+                  </div>
+                  <p className="text-xs mt-4" style={{ color: COLORS.muted }}>
+                    最近作った料理は、次の提案でちょっと出にくくなるよ
+                  </p>
+                </>
+              )
+            )}
+
+            {/* ── カレンダー表示 ── */}
+            {historyView === "calendar" && (
+              <>
+                {/* 月ナビゲーション */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                  <button
+                    onClick={() => { setCalendarMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1)); setSelectedDay(null); }}
+                    className="chalk-btn px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, fontSize: "0.85rem", color: COLORS.chalk }}>
+                    ◀
+                  </button>
+                  <span style={{ fontFamily: DISPLAY_FONT, fontSize: "1.1rem", color: COLORS.chalk }}>
+                    {calendarMonth.getFullYear()}年{calendarMonth.getMonth() + 1}月
+                  </span>
+                  <button
+                    onClick={() => { setCalendarMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1)); setSelectedDay(null); }}
+                    className="chalk-btn px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, fontSize: "0.85rem", color: COLORS.chalk }}>
+                    ▶
+                  </button>
+                </div>
+
+                {/* 曜日ヘッダー */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px", marginBottom: "3px" }}>
+                  {["日","月","火","水","木","金","土"].map((d, i) => (
+                    <div key={d} style={{
+                      textAlign: "center",
+                      fontSize: "0.68rem",
+                      fontFamily: MONO_FONT,
+                      color: i === 0 ? "#E07070" : i === 6 ? "#7090E0" : COLORS.muted,
+                      padding: "0.2rem 0",
+                    }}>{d}</div>
                   ))}
                 </div>
-                <p className="text-xs mt-4" style={{ color: COLORS.muted }}>
-                  最近作った料理は、次の提案でちょっと出にくくなるよ
-                </p>
+
+                {/* カレンダーグリッド */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px" }}>
+                  {(() => {
+                    const year = calendarMonth.getFullYear();
+                    const month = calendarMonth.getMonth();
+                    const firstDay = new Date(year, month, 1).getDay();
+                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                    const todayKey = formatDayKey(new Date());
+                    const cells = [];
+
+                    for (let i = 0; i < firstDay; i++) {
+                      cells.push(<div key={`empty-${i}`} style={{ aspectRatio: "1" }} />);
+                    }
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      const dayKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                      const records = historyByDay[dayKey] || [];
+                      const isToday = dayKey === todayKey;
+                      const isSelected = dayKey === selectedDay;
+                      const hasRecord = records.length > 0;
+                      const thumb = records.find((r) => r.photo)?.photo;
+
+                      cells.push(
+                        <button key={dayKey}
+                          onClick={() => hasRecord && setSelectedDay(isSelected ? null : dayKey)}
+                          style={{
+                            aspectRatio: "1",
+                            borderRadius: "0.4rem",
+                            position: "relative",
+                            overflow: "hidden",
+                            border: isSelected
+                              ? `2px solid ${COLORS.accent}`
+                              : isToday
+                              ? `2px solid ${COLORS.accent2}`
+                              : hasRecord
+                              ? `1px solid ${COLORS.border}`
+                              : `1px solid transparent`,
+                            backgroundColor: hasRecord ? COLORS.surfaceAlt : "transparent",
+                            cursor: hasRecord ? "pointer" : "default",
+                          }}>
+
+                          {thumb && (
+                            <img src={thumb} alt=""
+                              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                          )}
+                          {thumb && (
+                            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.22)" }} />
+                          )}
+                          {hasRecord && !thumb && (
+                            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>
+                              🍽
+                            </div>
+                          )}
+
+                          <span style={{
+                            position: "absolute", top: "2px", left: "3px",
+                            fontSize: "0.62rem",
+                            fontFamily: MONO_FONT,
+                            fontWeight: isToday ? 700 : 400,
+                            color: thumb ? "#fff" : isToday ? COLORS.accent : COLORS.chalk,
+                            lineHeight: 1,
+                            textShadow: thumb ? "0 1px 3px rgba(0,0,0,0.9)" : "none",
+                          }}>{d}</span>
+
+                          {records.length > 1 && (
+                            <span style={{
+                              position: "absolute", bottom: "2px", right: "2px",
+                              fontSize: "0.48rem",
+                              backgroundColor: COLORS.accent2, color: COLORS.bg,
+                              borderRadius: "999px", padding: "1px 3px",
+                              fontFamily: MONO_FONT, lineHeight: 1.4,
+                            }}>{records.length}</span>
+                          )}
+                        </button>
+                      );
+                    }
+                    return cells;
+                  })()}
+                </div>
+
+                {/* 選択した日の詳細パネル */}
+                {selectedDay && historyByDay[selectedDay] && (
+                  <div className="mt-4 p-4 rounded-2xl"
+                    style={{ backgroundColor: COLORS.surface, border: `2px solid ${COLORS.accent}` }}>
+                    <p className="text-sm font-bold mb-3" style={{ color: COLORS.accent }}>
+                      {(() => {
+                        const [y, m, d] = selectedDay.split("-");
+                        return `${y}年${Number(m)}月${Number(d)}日`;
+                      })()}
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {historyByDay[selectedDay].map((h) => (
+                        <div key={h.uid} className="flex items-center gap-3 px-3 py-2 rounded-xl"
+                          style={{ backgroundColor: COLORS.surfaceAlt }}>
+                          {h.photo ? (
+                            <button onClick={() => setLightboxPhoto(h.photo)} className="flex-shrink-0" aria-label="写真を拡大">
+                              <img src={h.photo} alt={h.name}
+                                style={{ width: "3rem", height: "3rem", objectFit: "cover", borderRadius: "0.4rem" }} />
+                            </button>
+                          ) : (
+                            <div className="flex-shrink-0"
+                              style={{ width: "3rem", height: "3rem", borderRadius: "0.4rem", backgroundColor: COLORS.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ fontSize: "1.2rem" }}>🍽</span>
+                            </div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p className="text-sm font-bold truncate">{h.name}</p>
+                            <p className="text-xs" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
+                              {String(h.at.getHours()).padStart(2, "0")}:{String(h.at.getMinutes()).padStart(2, "0")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {iconBtn("写真を変更", () => changePhoto(h.uid), Camera, COLORS.accent)}
+                            {h.photo && iconBtn("写真を削除", () => deletePhoto(h.uid), ImageOff, COLORS.muted)}
+                            {iconBtn("履歴を削除", () => deleteHistory(h.uid), Trash2, COLORS.accent2)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {history.length === 0 && (
+                  <p className="text-sm text-center py-8" style={{ color: COLORS.muted }}>
+                    まだ料理の記録がありません
+                  </p>
+                )}
               </>
             )}
           </>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
@@ -246,6 +246,23 @@ const RECIPES = [
 
 const isQuantifiable = (name) => Object.prototype.hasOwnProperty.call(DEFAULT_QTY, name);
 
+const resizeImage = (file, maxWidth, quality) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const w = Math.min(img.width, maxWidth);
+      const h = Math.round((img.height / img.width) * w);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = url;
+  });
+
 const LS = {
   get: (key, fallback) => {
     try {
@@ -271,6 +288,9 @@ export default function FridgeMenuApp() {
   const [expandedSteps, setExpandedSteps] = useState({});
   const [showPantry, setShowPantry] = useState(false);
   const [customSeasoningInput, setCustomSeasoningInput] = useState("");
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const fileInputRef = useRef(null);
+  const pendingUidRef = useRef(null);
   const [history, setHistory] = useState(() =>
     LS.get("history", []).map((h) => ({ ...h, at: new Date(h.at) }))
   );
@@ -354,7 +374,20 @@ export default function FridgeMenuApp() {
   };
 
   const markAsMade = (recipe) => {
-    setHistory((prev) => [...prev, { id: recipe.id, name: recipe.name, at: new Date() }]);
+    const uid = Date.now();
+    pendingUidRef.current = uid;
+    setHistory((prev) => [...prev, { uid, id: recipe.id, name: recipe.name, at: new Date() }]);
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    const uid = pendingUidRef.current;
+    pendingUidRef.current = null;
+    if (!file || !uid) return;
+    const resized = await resizeImage(file, 400, 0.75);
+    setHistory((prev) => prev.map((h) => h.uid === uid ? { ...h, photo: resized } : h));
   };
 
   const sortedRecipes = useMemo(() => {
@@ -952,10 +985,23 @@ export default function FridgeMenuApp() {
             </div>
             <div className="flex flex-col gap-1.5">
               {[...history].reverse().map((h, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg"
+                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg"
                   style={{ backgroundColor: COLORS.surfaceAlt }}>
-                  <span className="text-sm">{h.name}</span>
-                  <span className="text-xs" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
+                  {h.photo ? (
+                    <button onClick={() => setLightboxPhoto(h.photo)} className="flex-shrink-0"
+                      aria-label="写真を拡大表示">
+                      <img src={h.photo} alt={h.name}
+                        style={{ width: "2.5rem", height: "2.5rem", objectFit: "cover", borderRadius: "0.375rem" }} />
+                    </button>
+                  ) : (
+                    <div className="flex-shrink-0"
+                      style={{ width: "2.5rem", height: "2.5rem", borderRadius: "0.375rem",
+                        backgroundColor: COLORS.border, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: "1rem" }}>🍽</span>
+                    </div>
+                  )}
+                  <span className="text-sm flex-1">{h.name}</span>
+                  <span className="text-xs flex-shrink-0" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
                     {h.at.getMonth() + 1}/{h.at.getDate()} {String(h.at.getHours()).padStart(2, "0")}:{String(h.at.getMinutes()).padStart(2, "0")}
                   </span>
                 </div>
@@ -967,6 +1013,23 @@ export default function FridgeMenuApp() {
           </section>
         )}
       </div>
+
+      <input ref={fileInputRef} type="file" accept="image/*"
+        onChange={handlePhotoSelected}
+        style={{ display: "none" }} aria-hidden="true" />
+
+      {lightboxPhoto && (
+        <div
+          onClick={() => setLightboxPhoto(null)}
+          style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.88)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 50, padding: "1rem", cursor: "zoom-out",
+          }}>
+          <img src={lightboxPhoto} alt="料理の写真"
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "0.5rem" }} />
+        </div>
+      )}
     </div>
   );
 }

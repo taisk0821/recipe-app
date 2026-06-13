@@ -498,8 +498,12 @@ export default function FridgeMenuApp() {
 
   const rateRecipe = (recipeId, type) => {
     setRatings((prev) => {
-      const cur = prev[recipeId] || { good: 0, bad: 0 };
-      return { ...prev, [recipeId]: { ...cur, [type]: cur[type] + 1 } };
+      if (prev[recipeId] === type) {
+        const next = { ...prev };
+        delete next[recipeId];
+        return next;
+      }
+      return { ...prev, [recipeId]: type };
     });
   };
 
@@ -614,8 +618,8 @@ export default function FridgeMenuApp() {
       const useSoonHit = details.filter((d) => useSoon.has(d.name) && d.status !== "missing").length;
       coverage += useSoonHit * (karaito ? 0.7 : 0.25);
       if (recentIds.has(r.id)) coverage *= 0.4;
-      const { good = 0, bad = 0 } = ratings[r.id] || {};
-      coverage = Math.max(0, coverage + (good - bad) * 0.1);
+      const myRating = ratings[r.id];
+      coverage = Math.max(0, coverage + (myRating === "good" ? 0.1 : myRating === "bad" ? -0.1 : 0));
       const okCount = details.filter((d) => d.status === "ok").length;
       return { ...r, details, missingSeasonings, coverage, okCount, useSoonHit, displayKcal: Math.round(r.kcal * factor) };
     })
@@ -1043,7 +1047,7 @@ export default function FridgeMenuApp() {
                   const made = history.some((h) => h.id === recipe.id);
                   const emoji = RECIPE_EMOJIS[recipe.id] || "🍽️";
                   const gradient = CARD_GRADIENTS[recipe.id % CARD_GRADIENTS.length];
-                  const recipeRating = ratings[recipe.id] || { good: 0, bad: 0 };
+                  const myRating = ratings[recipe.id];
                   const photo = recipeImages[String(recipe.id)];
                   return (
                     <section key={recipe.id} className="fade-up rounded-2xl overflow-hidden"
@@ -1108,32 +1112,40 @@ export default function FridgeMenuApp() {
                         </div>
 
                         {/* 評価ボタン */}
-                        <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
+                        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
                           {[
                             { type: "good", icon: "👍", label: "おいしかった" },
                             { type: "bad",  icon: "👎", label: "微妙" },
                           ].map(({ type, icon, label }) => {
-                            const count = recipeRating[type] || 0;
+                            const isSelected = myRating === type;
+                            const isDisabled = !!myRating && !isSelected;
                             return (
-                              <button key={type} onClick={() => rateRecipe(recipe.id, type)}
+                              <button key={type}
+                                onClick={() => rateRecipe(recipe.id, type)}
+                                disabled={isDisabled}
                                 className="chalk-btn"
                                 style={{
-                                  backgroundColor: "rgba(0,0,0,0.25)",
-                                  border: "1px solid rgba(255,255,255,0.2)",
+                                  backgroundColor: isSelected ? "rgba(242,193,78,0.9)" : "rgba(0,0,0,0.25)",
+                                  border: isSelected ? "2px solid rgba(242,193,78,1)" : "1px solid rgba(255,255,255,0.2)",
                                   borderRadius: "999px",
                                   padding: "0.3rem 0.85rem",
-                                  color: "rgba(255,255,255,0.85)",
+                                  color: isSelected ? "#1a2420" : isDisabled ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.85)",
                                   display: "flex", alignItems: "center", gap: "0.3rem",
                                   fontSize: "0.8rem",
+                                  cursor: isDisabled ? "not-allowed" : "pointer",
+                                  opacity: isDisabled ? 0.45 : 1,
+                                  fontWeight: isSelected ? 700 : 400,
                                 }}>
                                 <span>{icon}</span>
                                 <span style={{ fontSize: "0.75rem" }}>{label}</span>
-                                {count > 0 && (
-                                  <span style={{ fontFamily: MONO_FONT, fontSize: "0.7rem", opacity: 0.65 }}>×{count}</span>
-                                )}
                               </button>
                             );
                           })}
+                          {myRating && (
+                            <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.45)", fontFamily: MONO_FONT }}>
+                              自分の評価: {myRating === "good" ? "👍" : "👎"}
+                            </span>
+                          )}
                         </div>
                         {photo && (
                           <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>
@@ -1347,7 +1359,7 @@ export default function FridgeMenuApp() {
                         const made = history.some((h) => h.id === recipe.id);
                         const emoji = RECIPE_EMOJIS[recipe.id] || "🍽️";
                         const gradient = CARD_GRADIENTS[recipe.id % CARD_GRADIENTS.length];
-                        const recipeRating = ratings[recipe.id] || { good: 0, bad: 0 };
+                        const myRating = ratings[recipe.id];
                         const missingDetails = recipe.details.filter((d) => d.status !== "ok");
                         const photo = recipeImages[String(recipe.id)];
                         return (
@@ -1382,18 +1394,37 @@ export default function FridgeMenuApp() {
                                 </span>
                               </div>
 
-                              <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
+                              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
                                 {[{ type: "good", icon: "👍", label: "おいしかった" }, { type: "bad", icon: "👎", label: "微妙" }].map(({ type, icon, label }) => {
-                                  const count = recipeRating[type] || 0;
+                                  const isSelected = myRating === type;
+                                  const isDisabled = !!myRating && !isSelected;
                                   return (
-                                    <button key={type} onClick={() => rateRecipe(recipe.id, type)} className="chalk-btn"
-                                      style={{ backgroundColor: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "999px", padding: "0.3rem 0.85rem", color: "rgba(255,255,255,0.85)", display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.8rem" }}>
+                                    <button key={type}
+                                      onClick={() => rateRecipe(recipe.id, type)}
+                                      disabled={isDisabled}
+                                      className="chalk-btn"
+                                      style={{
+                                        backgroundColor: isSelected ? "rgba(242,193,78,0.9)" : "rgba(0,0,0,0.25)",
+                                        border: isSelected ? "2px solid rgba(242,193,78,1)" : "1px solid rgba(255,255,255,0.2)",
+                                        borderRadius: "999px",
+                                        padding: "0.3rem 0.85rem",
+                                        color: isSelected ? "#1a2420" : isDisabled ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.85)",
+                                        display: "flex", alignItems: "center", gap: "0.3rem",
+                                        fontSize: "0.8rem",
+                                        cursor: isDisabled ? "not-allowed" : "pointer",
+                                        opacity: isDisabled ? 0.45 : 1,
+                                        fontWeight: isSelected ? 700 : 400,
+                                      }}>
                                       <span>{icon}</span>
                                       <span style={{ fontSize: "0.75rem" }}>{label}</span>
-                                      {count > 0 && <span style={{ fontFamily: MONO_FONT, fontSize: "0.7rem", opacity: 0.65 }}>×{count}</span>}
                                     </button>
                                   );
                                 })}
+                                {myRating && (
+                                  <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.45)", fontFamily: MONO_FONT }}>
+                                    自分の評価: {myRating === "good" ? "👍" : "👎"}
+                                  </span>
+                                )}
                               </div>
                               {photo && (
                                 <p style={{ position: "relative", fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "right" }}>

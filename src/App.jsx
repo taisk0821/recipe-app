@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
@@ -20,9 +20,8 @@ const BODY_FONT = "'Zen Kaku Gothic New', sans-serif";
 const MONO_FONT = "'JetBrains Mono', monospace";
 
 const ALL_SEASONINGS = [
-  "塩", "こしょう", "砂糖", "醤油", "味噌", "みりん", "酒", "酢",
-  "サラダ油", "ごま油", "バター", "マヨネーズ", "ケチャップ", "ソース",
-  "ポン酢", "めんつゆ", "コンソメ", "顆粒だし", "鶏ガラスープの素", "にんにく(チューブ)", "しょうが(チューブ)",
+  "塩", "こしょう", "砂糖", "醤油", "味噌", "みりん", "酒",
+  "サラダ油", "ごま油", "にんにく(チューブ)", "しょうが(チューブ)", "コンソメ",
 ];
 
 const DEFAULT_SEASONINGS = ["塩", "こしょう", "砂糖", "醤油", "サラダ油"];
@@ -247,11 +246,23 @@ const RECIPES = [
 
 const isQuantifiable = (name) => Object.prototype.hasOwnProperty.call(DEFAULT_QTY, name);
 
+const LS = {
+  get: (key, fallback) => {
+    try {
+      const v = localStorage.getItem(key);
+      return v !== null ? JSON.parse(v) : fallback;
+    } catch { return fallback; }
+  },
+  set: (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  },
+};
+
 export default function FridgeMenuApp() {
-  const [fridge, setFridge] = useState({});
+  const [fridge, setFridge] = useState(() => LS.get("fridge", {}));
   const [useSoon, setUseSoon] = useState(new Set());
-  const [pantry, setPantry] = useState(new Set(DEFAULT_SEASONINGS));
-  const [servings, setServings] = useState(2);
+  const [pantry, setPantry] = useState(() => new Set(LS.get("pantry", DEFAULT_SEASONINGS)));
+  const [servings, setServings] = useState(() => LS.get("servings", 2));
   const [moodFilter, setMoodFilter] = useState(null);
   const [customInput, setCustomInput] = useState("");
   const [hasDecided, setHasDecided] = useState(false);
@@ -259,8 +270,17 @@ export default function FridgeMenuApp() {
   const [pageIndex, setPageIndex] = useState(0);
   const [expandedSteps, setExpandedSteps] = useState({});
   const [showPantry, setShowPantry] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [shoppingList, setShoppingList] = useState([]);
+  const [customSeasoningInput, setCustomSeasoningInput] = useState("");
+  const [history, setHistory] = useState(() =>
+    LS.get("history", []).map((h) => ({ ...h, at: new Date(h.at) }))
+  );
+  const [shoppingList, setShoppingList] = useState(() => LS.get("shoppingList", []));
+
+  useEffect(() => { LS.set("fridge", fridge); }, [fridge]);
+  useEffect(() => { LS.set("pantry", [...pantry]); }, [pantry]);
+  useEffect(() => { LS.set("servings", servings); }, [servings]);
+  useEffect(() => { LS.set("history", history.map((h) => ({ ...h, at: h.at.toISOString() }))); }, [history]);
+  useEffect(() => { LS.set("shoppingList", shoppingList); }, [shoppingList]);
 
   const selectedNames = Object.keys(fridge);
   const recentIds = new Set(history.slice(-3).map((h) => h.id));
@@ -307,6 +327,14 @@ export default function FridgeMenuApp() {
       const next = Math.max(step, cur + delta * step);
       return { ...prev, [name]: next };
     });
+  };
+
+  const addCustomSeasoning = () => {
+    const value = customSeasoningInput.trim();
+    if (value && !pantry.has(value)) {
+      setPantry((prev) => new Set([...prev, value]));
+    }
+    setCustomSeasoningInput("");
   };
 
   const addCustom = () => {
@@ -477,6 +505,36 @@ export default function FridgeMenuApp() {
                     </button>
                   );
                 })}
+                {[...pantry].filter((s) => !ALL_SEASONINGS.includes(s)).map((s) => (
+                  <button key={s} onClick={() => toggleSeasoning(s)}
+                    className="chip chalk-btn px-3 py-1.5 rounded-full text-xs border flex items-center gap-1"
+                    style={{
+                      backgroundColor: COLORS.accent,
+                      color: COLORS.bg,
+                      borderColor: COLORS.accent,
+                      fontWeight: 700,
+                    }}>
+                    {s}
+                    <X size={10} />
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-3">
+                <input value={customSeasoningInput}
+                  onChange={(e) => setCustomSeasoningInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addCustomSeasoning()}
+                  placeholder="その他の調味料を追加"
+                  className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{
+                    backgroundColor: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}`,
+                    color: COLORS.chalk, fontFamily: BODY_FONT,
+                  }} />
+                <button onClick={addCustomSeasoning}
+                  className="chalk-btn px-3 py-2 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}` }}
+                  aria-label="調味料を追加">
+                  <Plus size={18} style={{ color: COLORS.chalk }} />
+                </button>
               </div>
             </div>
           )}

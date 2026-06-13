@@ -624,39 +624,49 @@ export default function FridgeMenuApp() {
         </div>
       </nav>
 
-      {/* Back button — fixed top-left (sub-pages only) */}
-      {currentPage !== "main" && (
-        <button onClick={() => setCurrentPage("main")}
-          className="chalk-btn"
-          aria-label="ホームに戻る"
-          style={{
-            position: "fixed", top: "1.1rem", left: "1.1rem", zIndex: 45,
-            height: "2.4rem", padding: "0 0.75rem",
-            backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
-            borderRadius: "0.6rem",
-            display: "flex", alignItems: "center", gap: "0.2rem",
-          }}>
-          <ChevronLeft size={16} style={{ color: COLORS.chalk }} />
-          <span style={{ fontSize: "0.8rem", color: COLORS.chalk, fontFamily: BODY_FONT }}>ホーム</span>
-        </button>
-      )}
+      {/* Fixed top header bar — back button (left) + hamburger (right) */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 45,
+        height: "3.5rem",
+        backgroundColor: COLORS.bg,
+        borderBottom: `1px solid ${COLORS.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 1rem",
+      }}>
+        {/* Left: back button on sub-pages, empty spacer on main */}
+        {currentPage !== "main" ? (
+          <button onClick={() => setCurrentPage("main")}
+            className="chalk-btn"
+            aria-label="ホームに戻る"
+            style={{
+              height: "2.2rem", padding: "0 0.75rem",
+              backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
+              borderRadius: "0.5rem",
+              display: "flex", alignItems: "center", gap: "0.2rem",
+            }}>
+            <ChevronLeft size={15} style={{ color: COLORS.chalk }} />
+            <span style={{ fontSize: "0.8rem", color: COLORS.chalk, fontFamily: BODY_FONT }}>ホーム</span>
+          </button>
+        ) : (
+          <div style={{ width: "2.2rem" }} />
+        )}
 
-      {/* Hamburger — fixed top-right */}
-      <button onClick={() => setSideMenuOpen(true)}
-        className="chalk-btn"
-        aria-label="メニューを開く"
-        style={{
-          position: "fixed", top: "1.1rem", right: "1.1rem", zIndex: 45,
-          width: "2.4rem", height: "2.4rem",
-          backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
-          borderRadius: "0.6rem",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-        <Menu size={18} style={{ color: COLORS.chalk }} />
-      </button>
+        {/* Right: hamburger */}
+        <button onClick={() => setSideMenuOpen(true)}
+          className="chalk-btn"
+          aria-label="メニューを開く"
+          style={{
+            width: "2.2rem", height: "2.2rem",
+            backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
+            borderRadius: "0.5rem",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+          <Menu size={17} style={{ color: COLORS.chalk }} />
+        </button>
+      </div>
 
       {/* Page content */}
-      <div className="max-w-md mx-auto px-5" style={{ paddingTop: "4.5rem", paddingBottom: "3rem" }}>
+      <div className="max-w-md mx-auto px-5" style={{ paddingTop: "5rem", paddingBottom: "3rem" }}>
 
         {/* ── MAIN ── */}
         {currentPage === "main" && (

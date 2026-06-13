@@ -299,7 +299,11 @@ export default function FridgeMenuApp() {
     let t = 0;
     return LS.get("history", []).map((h) => ({ ...h, uid: h.uid ?? --t, at: new Date(h.at) }));
   });
-  const [shoppingList, setShoppingList] = useState(() => LS.get("shoppingList", []));
+  const [shoppingList, setShoppingList] = useState(() =>
+    LS.get("shoppingList", []).map((item) =>
+      typeof item === "string" ? { text: item, bought: false } : item
+    )
+  );
   const [shoppingInput, setShoppingInput] = useState("");
   const [shoppingMemo, setShoppingMemo] = useState(() => LS.get("shoppingMemo", ""));
   const [currentPage, setCurrentPage] = useState("main");
@@ -367,18 +371,26 @@ export default function FridgeMenuApp() {
     setCustomSeasoningInput("");
   };
 
-  const addToShoppingList = (item) => {
-    setShoppingList((prev) => (prev.includes(item) ? prev : [...prev, item]));
+  const addToShoppingList = (text) => {
+    setShoppingList((prev) =>
+      prev.some((i) => i.text === text) ? prev : [...prev, { text, bought: false }]
+    );
   };
 
-  const removeFromShoppingList = (item) => {
-    setShoppingList((prev) => prev.filter((i) => i !== item));
+  const removeFromShoppingList = (text) => {
+    setShoppingList((prev) => prev.filter((i) => i.text !== text));
+  };
+
+  const toggleBought = (text) => {
+    setShoppingList((prev) =>
+      prev.map((i) => i.text === text ? { ...i, bought: !i.bought } : i)
+    );
   };
 
   const addShoppingItem = () => {
     const value = shoppingInput.trim();
-    if (value && !shoppingList.includes(value)) {
-      setShoppingList((prev) => [...prev, value]);
+    if (value && !shoppingList.some((i) => i.text === value)) {
+      setShoppingList((prev) => [...prev, { text: value, bought: false }]);
     }
     setShoppingInput("");
   };
@@ -997,12 +1009,34 @@ export default function FridgeMenuApp() {
             ) : (
               <div className="flex flex-col gap-2 mb-6">
                 {shoppingList.map((item) => (
-                  <div key={item} className="flex items-center justify-between px-4 py-3 rounded-xl"
-                    style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-                    <span className="text-sm">{item}</span>
-                    <button onClick={() => removeFromShoppingList(item)}
-                      className="chalk-btn" aria-label={`${item}をリストから削除`}>
-                      <X size={16} style={{ color: COLORS.muted }} />
+                  <div key={item.text} className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                    style={{
+                      backgroundColor: COLORS.surface,
+                      border: `1px solid ${item.bought ? COLORS.border : COLORS.border}`,
+                      opacity: item.bought ? 0.5 : 1,
+                      transition: "opacity 0.2s ease",
+                    }}>
+                    <button onClick={() => toggleBought(item.text)}
+                      className="chalk-btn flex-shrink-0 flex items-center justify-center rounded-full"
+                      style={{
+                        width: "1.4rem", height: "1.4rem",
+                        border: `2px solid ${item.bought ? COLORS.accent : COLORS.muted}`,
+                        backgroundColor: item.bought ? COLORS.accent : "transparent",
+                      }}
+                      aria-label={item.bought ? "未購入に戻す" : "購入済みにする"}>
+                      {item.bought && (
+                        <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                          <path d="M1 3.5L3.5 6L8 1" stroke={COLORS.bg} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </button>
+                    <span className="text-sm flex-1"
+                      style={{ textDecoration: item.bought ? "line-through" : "none", color: COLORS.chalk }}>
+                      {item.text}
+                    </span>
+                    <button onClick={() => removeFromShoppingList(item.text)}
+                      className="chalk-btn flex-shrink-0" aria-label={`${item.text}をリストから削除`}>
+                      <X size={15} style={{ color: COLORS.muted }} />
                     </button>
                   </div>
                 ))}

@@ -35,6 +35,20 @@ const MOODS = [
   { key: "jitan", label: "時短" },
 ];
 
+const RECIPE_EMOJIS = {
+  1: "🥘", 2: "🍳", 3: "🍚", 4: "🍲", 5: "🍗",
+  6: "🥬", 7: "🥢", 8: "🥩", 9: "🍅", 10: "🥣",
+  11: "🐟", 12: "🌶️", 13: "🥗", 14: "🍆", 15: "🍳",
+};
+
+const CARD_GRADIENTS = [
+  "linear-gradient(140deg, #4B6050 0%, #354A3C 100%)",
+  "linear-gradient(140deg, #5C4A36 0%, #453828 100%)",
+  "linear-gradient(140deg, #3A4E5C 0%, #2C3E4A 100%)",
+  "linear-gradient(140deg, #5A4E30 0%, #443C22 100%)",
+  "linear-gradient(140deg, #4E3845 0%, #3A2C38 100%)",
+];
+
 const UNITS = {
   卵: "個", 豚肉: "g", 鶏肉: "g", キャベツ: "g", にんじん: "本", 玉ねぎ: "個", ねぎ: "本",
   豆腐: "丁", ごはん: "杯", じゃがいも: "個", トマト: "個", なす: "本", もやし: "袋",
@@ -308,6 +322,7 @@ export default function FridgeMenuApp() {
   );
   const [shoppingInput, setShoppingInput] = useState("");
   const [shoppingMemo, setShoppingMemo] = useState(() => LS.get("shoppingMemo", ""));
+  const [ratings, setRatings] = useState(() => LS.get("ratings", {}));
   const [currentPage, setCurrentPage] = useState("main");
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
 
@@ -321,6 +336,7 @@ export default function FridgeMenuApp() {
   useEffect(() => { LS.set("history", history.map((h) => ({ ...h, at: h.at.toISOString() }))); }, [history]);
   useEffect(() => { LS.set("shoppingList", shoppingList); }, [shoppingList]);
   useEffect(() => { LS.set("shoppingMemo", shoppingMemo); }, [shoppingMemo]);
+  useEffect(() => { LS.set("ratings", ratings); }, [ratings]);
 
   const selectedNames = Object.keys(fridge);
   const recentIds = new Set(history.slice(-3).map((h) => h.id));
@@ -398,6 +414,13 @@ export default function FridgeMenuApp() {
     setShoppingInput("");
   };
 
+  const rateRecipe = (recipeId, type) => {
+    setRatings((prev) => {
+      const cur = prev[recipeId] || { good: 0, bad: 0 };
+      return { ...prev, [recipeId]: { ...cur, [type]: cur[type] + 1 } };
+    });
+  };
+
   const markAsMade = (recipe) => {
     const uid = Date.now();
     pendingUidRef.current = uid;
@@ -441,6 +464,7 @@ export default function FridgeMenuApp() {
       history: history.map((h) => ({ ...h, at: h.at.toISOString() })),
       shoppingList,
       shoppingMemo,
+      ratings,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -475,6 +499,7 @@ export default function FridgeMenuApp() {
           ));
         }
         if (data.shoppingMemo !== undefined) setShoppingMemo(data.shoppingMemo);
+        if (data.ratings !== undefined) setRatings(data.ratings);
         alert("復元が完了しました");
       } catch {
         alert("読み込みに失敗しました。正しいバックアップファイルか確認してください。");
@@ -485,6 +510,7 @@ export default function FridgeMenuApp() {
 
   const sortedRecipes = useMemo(() => {
     const factor = servings / 2;
+    const karaito = moodFilter === "karaito";
     return RECIPES.map((r) => {
       const details = r.ingredients.map((ing) => {
         const required = Math.max(1, Math.round(ing.amount * factor));
@@ -504,15 +530,17 @@ export default function FridgeMenuApp() {
       let coverage = ingScore / details.length;
       coverage *= 1 - Math.min(0.3, missingSeasonings.length * 0.05);
       const useSoonHit = details.filter((d) => useSoon.has(d.name) && d.status !== "missing").length;
-      coverage += useSoonHit * 0.25;
+      coverage += useSoonHit * (karaito ? 0.7 : 0.25);
       if (recentIds.has(r.id)) coverage *= 0.4;
+      const { good = 0, bad = 0 } = ratings[r.id] || {};
+      coverage = Math.max(0, coverage + (good - bad) * 0.1);
       const okCount = details.filter((d) => d.status === "ok").length;
       return { ...r, details, missingSeasonings, coverage, okCount, useSoonHit, displayKcal: Math.round(r.kcal * factor) };
     })
       .filter((r) => r.okCount > 0 || r.details.some((d) => d.status === "insufficient"))
-      .filter((r) => (moodFilter ? r.moods.includes(moodFilter) : true))
+      .filter((r) => (moodFilter && !karaito ? r.moods.includes(moodFilter) : true))
       .sort((a, b) => b.coverage - a.coverage || a.time - b.time);
-  }, [fridge, pantry, servings, moodFilter, useSoon, history]);
+  }, [fridge, pantry, servings, moodFilter, useSoon, history, ratings]);
 
   const pageSize = 3;
   const totalPages = Math.max(1, Math.ceil(sortedRecipes.length / pageSize));
@@ -709,7 +737,7 @@ export default function FridgeMenuApp() {
             {/* きぶん */}
             <section className="mb-6">
               <h2 className="text-sm font-bold mb-3">今日のきぶん</h2>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-2">
                 {MOODS.map((m) => {
                   const active = moodFilter === m.key;
                   return (
@@ -726,6 +754,18 @@ export default function FridgeMenuApp() {
                   );
                 })}
               </div>
+              <button
+                onClick={() => setMoodFilter(moodFilter === "karaito" ? null : "karaito")}
+                className="chip chalk-btn w-full py-2 rounded-lg text-sm border"
+                style={{
+                  backgroundColor: moodFilter === "karaito" ? COLORS.surfaceAlt : "transparent",
+                  color: moodFilter === "karaito" ? COLORS.accent : COLORS.muted,
+                  borderColor: moodFilter === "karaito" ? COLORS.accent : COLORS.border,
+                  borderStyle: "dashed",
+                  fontWeight: moodFilter === "karaito" ? 700 : 400,
+                }}>
+                🧹 冷蔵庫を空にしたい（⏰食材を強く優先）
+              </button>
             </section>
 
             {/* 選んだ食材 */}
@@ -857,134 +897,182 @@ export default function FridgeMenuApp() {
                   const isTop = (index === 0 && pageIndex === 0) || !!randomPick;
                   const open = !!expandedSteps[recipe.id];
                   const made = history.some((h) => h.id === recipe.id);
+                  const emoji = RECIPE_EMOJIS[recipe.id] || "🍽️";
+                  const gradient = CARD_GRADIENTS[recipe.id % CARD_GRADIENTS.length];
+                  const recipeRating = ratings[recipe.id] || { good: 0, bad: 0 };
                   return (
-                    <section key={recipe.id} className="fade-up rounded-2xl p-5 bg-texture"
-                      style={{ backgroundColor: COLORS.surface, border: `1px solid ${isTop ? COLORS.accent : COLORS.border}`, animationDelay: `${index * 0.08}s` }}>
-                      <div className="flex items-center justify-between mb-4">
-                        <p style={{ color: isTop ? COLORS.accent : COLORS.muted, fontFamily: MONO_FONT, fontSize: "0.7rem", letterSpacing: "0.2em" }}>
-                          {randomPick ? "運命の一品" : isTop ? "本日のおすすめ" : `候補 ${pageIndex * pageSize + index + 1}`}
-                        </p>
-                        {recipe.useSoonHit > 0 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1"
-                            style={{ backgroundColor: COLORS.accent2, color: COLORS.bg }}>
-                            <AlarmClock size={11} />使い切り
+                    <section key={recipe.id} className="fade-up rounded-2xl overflow-hidden"
+                      style={{
+                        border: `2px solid ${isTop ? COLORS.accent : COLORS.border}`,
+                        animationDelay: `${index * 0.08}s`,
+                      }}>
+
+                      {/* カラーヘッダー */}
+                      <div style={{ background: gradient, padding: "1.25rem", position: "relative", overflow: "hidden" }}>
+                        {/* 背景デコ絵文字 */}
+                        <div aria-hidden="true" style={{
+                          position: "absolute", right: "-0.25rem", top: "-0.75rem",
+                          fontSize: "7rem", lineHeight: 1, opacity: 0.1,
+                          pointerEvents: "none", userSelect: "none",
+                        }}>{emoji}</div>
+
+                        {/* ラベル行 */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", position: "relative" }}>
+                          <p style={{ color: isTop ? COLORS.accent : "rgba(255,255,255,0.55)", fontFamily: MONO_FONT, fontSize: "0.7rem", letterSpacing: "0.2em" }}>
+                            {randomPick ? "★ 運命の一品" : isTop ? "★ 本日のおすすめ" : `候補 ${pageIndex * pageSize + index + 1}`}
+                          </p>
+                          {recipe.useSoonHit > 0 && (
+                            <span className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1"
+                              style={{ backgroundColor: COLORS.accent2, color: COLORS.bg }}>
+                              <AlarmClock size={11} />使い切り
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 絵文字 + タイトル */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative", marginBottom: "0.75rem" }}>
+                          <span style={{ fontSize: "3rem", lineHeight: 1, flexShrink: 0 }}>{emoji}</span>
+                          <h3 style={{
+                            fontFamily: DISPLAY_FONT,
+                            fontSize: isTop ? "1.85rem" : "1.5rem",
+                            color: "#fff",
+                            lineHeight: 1.2,
+                          }}>{recipe.name}</h3>
+                        </div>
+
+                        {/* メタ情報 */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative", marginBottom: "0.75rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <Flame size={14} style={{ color: COLORS.accent2 }} />
+                            <span style={{ fontFamily: MONO_FONT, fontSize: "0.85rem", color: COLORS.accent2, fontWeight: 700 }}>約{recipe.displayKcal}kcal</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <Clock size={14} style={{ color: COLORS.accent }} />
+                            <span style={{ fontFamily: MONO_FONT, fontSize: "0.85rem", color: COLORS.accent, fontWeight: 700 }}>約{recipe.time}分</span>
+                          </div>
+                          <span style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.5)" }}>
+                            {recipe.moods.map((m) => MOODS.find((x) => x.key === m)?.label).join("・")}
                           </span>
-                        )}
-                      </div>
-
-                      {isTop ? (
-                        <div className="relative inline-block mb-1">
-                          <svg viewBox="0 0 300 110" className="absolute"
-                            style={{ top: "-18%", left: "-8%", width: "116%", height: "140%", overflow: "visible", pointerEvents: "none" }}>
-                            <path className="circle-path"
-                              d="M 18 58 C 16 22, 90 4, 152 7 C 232 11, 292 28, 282 58 C 292 92, 220 112, 150 109 C 70 113, 12 96, 18 58 Z"
-                              fill="none" stroke={COLORS.accent2} strokeWidth="4" strokeLinecap="round" />
-                          </svg>
-                          <h3 style={{ fontFamily: DISPLAY_FONT, fontSize: "1.9rem", color: COLORS.chalk, position: "relative" }}>{recipe.name}</h3>
                         </div>
-                      ) : (
-                        <h3 style={{ fontFamily: DISPLAY_FONT, fontSize: "1.5rem", color: COLORS.chalk }}>{recipe.name}</h3>
-                      )}
 
-                      <div className="flex items-center gap-4 mt-3 mb-4">
-                        <div className="flex items-center gap-1.5">
-                          <Flame size={16} style={{ color: COLORS.accent2 }} />
-                          <span style={{ fontFamily: MONO_FONT, fontSize: "0.9rem", color: COLORS.accent2, fontWeight: 700 }}>約{recipe.displayKcal}kcal</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={16} style={{ color: COLORS.accent }} />
-                          <span style={{ fontFamily: MONO_FONT, fontSize: "0.9rem", color: COLORS.accent, fontWeight: 700 }}>約{recipe.time}分</span>
-                        </div>
-                        <span className="text-xs" style={{ color: COLORS.muted }}>
-                          {recipe.moods.map((m) => MOODS.find((x) => x.key === m)?.label).join("・")}
-                        </span>
-                      </div>
-
-                      <div className="mb-2">
-                        <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>
-                          必要な食材({servings}人前)。足りないものはタップで買い物リストへ
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {recipe.details.map((d) => {
-                            const lacking = d.status !== "ok";
-                            let bg = COLORS.surfaceAlt, color = COLORS.muted, border = "none";
-                            if (d.status === "ok") { bg = COLORS.accent; color = COLORS.bg; }
-                            else if (d.status === "insufficient") { bg = "transparent"; color = COLORS.accent2; border = `1px solid ${COLORS.accent2}`; }
-                            else { bg = "transparent"; color = COLORS.muted; border = `1px solid ${COLORS.border}`; }
-                            const unit = UNITS[d.name] || "";
-                            const label = d.status === "insufficient"
-                              ? `${d.name} ${d.required}${unit}(持ってる${d.have}${unit})`
-                              : `${d.name} ${d.required}${unit}`;
+                        {/* 評価ボタン */}
+                        <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
+                          {[
+                            { type: "good", icon: "👍", label: "おいしかった" },
+                            { type: "bad",  icon: "👎", label: "微妙" },
+                          ].map(({ type, icon, label }) => {
+                            const count = recipeRating[type] || 0;
                             return (
-                              <button key={d.name} onClick={() => lacking && addToShoppingList(d.name)}
-                                className="px-2.5 py-1 rounded-full text-xs"
-                                style={{ backgroundColor: bg, color, border, fontFamily: BODY_FONT, cursor: lacking ? "pointer" : "default" }}>
-                                {label}{lacking ? " +" : ""}
+                              <button key={type} onClick={() => rateRecipe(recipe.id, type)}
+                                className="chalk-btn"
+                                style={{
+                                  backgroundColor: "rgba(0,0,0,0.25)",
+                                  border: "1px solid rgba(255,255,255,0.2)",
+                                  borderRadius: "999px",
+                                  padding: "0.3rem 0.85rem",
+                                  color: "rgba(255,255,255,0.85)",
+                                  display: "flex", alignItems: "center", gap: "0.3rem",
+                                  fontSize: "0.8rem",
+                                }}>
+                                <span>{icon}</span>
+                                <span style={{ fontSize: "0.75rem" }}>{label}</span>
+                                {count > 0 && (
+                                  <span style={{ fontFamily: MONO_FONT, fontSize: "0.7rem", opacity: 0.65 }}>×{count}</span>
+                                )}
                               </button>
                             );
                           })}
                         </div>
                       </div>
 
-                      {recipe.seasonings.length > 0 && (
+                      {/* カードボディ */}
+                      <div style={{ backgroundColor: COLORS.surface, padding: "1rem 1.25rem 1.25rem" }}>
                         <div className="mb-2">
-                          <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>使う調味料</p>
+                          <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>
+                            必要な食材({servings}人前)。足りないものはタップで買い物リストへ
+                          </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {recipe.seasonings.map((s) => {
-                              const has = pantry.has(s);
+                            {recipe.details.map((d) => {
+                              const lacking = d.status !== "ok";
+                              let bg = COLORS.surfaceAlt, color = COLORS.muted, border = "none";
+                              if (d.status === "ok") { bg = COLORS.accent; color = COLORS.bg; }
+                              else if (d.status === "insufficient") { bg = "transparent"; color = COLORS.accent2; border = `1px solid ${COLORS.accent2}`; }
+                              else { bg = "transparent"; color = COLORS.muted; border = `1px solid ${COLORS.border}`; }
+                              const unit = UNITS[d.name] || "";
+                              const label = d.status === "insufficient"
+                                ? `${d.name} ${d.required}${unit}(持ってる${d.have}${unit})`
+                                : `${d.name} ${d.required}${unit}`;
                               return (
-                                <button key={s} onClick={() => !has && addToShoppingList(s)}
+                                <button key={d.name} onClick={() => lacking && addToShoppingList(d.name)}
                                   className="px-2.5 py-1 rounded-full text-xs"
-                                  style={{
-                                    backgroundColor: has ? COLORS.surfaceAlt : "transparent",
-                                    color: has ? COLORS.chalk : COLORS.accent2,
-                                    border: has ? "none" : `1px solid ${COLORS.accent2}`,
-                                    fontFamily: BODY_FONT, cursor: has ? "default" : "pointer",
-                                  }}>
-                                  {has ? s : `${s} ✕なし +`}
+                                  style={{ backgroundColor: bg, color, border, fontFamily: BODY_FONT, cursor: lacking ? "pointer" : "default" }}>
+                                  {label}{lacking ? " +" : ""}
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                      )}
 
-                      <div className="flex gap-2 mt-3">
-                        <button onClick={() => toggleSteps(recipe.id)}
-                          className="chalk-btn flex-1 py-2.5 rounded-lg text-sm font-bold"
-                          style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk }}>
-                          {open ? "作り方を閉じる" : "作り方を見る"}
-                        </button>
-                        <button onClick={() => markAsMade(recipe)}
-                          className="chalk-btn flex-1 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5"
-                          style={{
-                            backgroundColor: made ? COLORS.accent : "transparent",
-                            color: made ? COLORS.bg : COLORS.accent,
-                            border: made ? "none" : `1px solid ${COLORS.accent}`,
-                          }}>
-                          <CheckCircle2 size={15} />
-                          {made ? "作った!" : "これ作った"}
-                        </button>
+                        {recipe.seasonings.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>使う調味料</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {recipe.seasonings.map((s) => {
+                                const has = pantry.has(s);
+                                return (
+                                  <button key={s} onClick={() => !has && addToShoppingList(s)}
+                                    className="px-2.5 py-1 rounded-full text-xs"
+                                    style={{
+                                      backgroundColor: has ? COLORS.surfaceAlt : "transparent",
+                                      color: has ? COLORS.chalk : COLORS.accent2,
+                                      border: has ? "none" : `1px solid ${COLORS.accent2}`,
+                                      fontFamily: BODY_FONT, cursor: has ? "default" : "pointer",
+                                    }}>
+                                    {has ? s : `${s} ✕なし +`}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={() => toggleSteps(recipe.id)}
+                            className="chalk-btn flex-1 py-2.5 rounded-lg text-sm font-bold"
+                            style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk }}>
+                            {open ? "作り方を閉じる" : "作り方を見る"}
+                          </button>
+                          <button onClick={() => markAsMade(recipe)}
+                            className="chalk-btn flex-1 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5"
+                            style={{
+                              backgroundColor: made ? COLORS.accent : "transparent",
+                              color: made ? COLORS.bg : COLORS.accent,
+                              border: made ? "none" : `1px solid ${COLORS.accent}`,
+                            }}>
+                            <CheckCircle2 size={15} />
+                            {made ? "作った!" : "これ作った"}
+                          </button>
+                        </div>
+
+                        {open && (
+                          <>
+                            <p className="text-xs mt-3 mb-2" style={{ color: COLORS.muted }}>
+                              ※分量は2人前基準。人数に合わせて調整してね
+                            </p>
+                            <ol className="mb-2 space-y-2">
+                              {recipe.steps.map((step, idx) => (
+                                <li key={idx} className="flex gap-2.5 text-sm" style={{ color: COLORS.chalk }}>
+                                  <span className="flex-shrink-0 flex items-center justify-center rounded-full"
+                                    style={{ width: "1.4rem", height: "1.4rem", backgroundColor: COLORS.accent, color: COLORS.bg, fontFamily: MONO_FONT, fontSize: "0.7rem", fontWeight: 700 }}>
+                                    {idx + 1}
+                                  </span>
+                                  <span className="leading-relaxed">{step}</span>
+                                </li>
+                              ))}
+                            </ol>
+                          </>
+                        )}
                       </div>
-
-                      {open && (
-                        <>
-                          <p className="text-xs mt-3 mb-2" style={{ color: COLORS.muted }}>
-                            ※分量は2人前基準。人数に合わせて調整してね
-                          </p>
-                          <ol className="mb-2 space-y-2">
-                            {recipe.steps.map((step, idx) => (
-                              <li key={idx} className="flex gap-2.5 text-sm" style={{ color: COLORS.chalk }}>
-                                <span className="flex-shrink-0 flex items-center justify-center rounded-full"
-                                  style={{ width: "1.4rem", height: "1.4rem", backgroundColor: COLORS.accent, color: COLORS.bg, fontFamily: MONO_FONT, fontSize: "0.7rem", fontWeight: 700 }}>
-                                  {idx + 1}
-                                </span>
-                                <span className="leading-relaxed">{step}</span>
-                              </li>
-                            ))}
-                          </ol>
-                        </>
-                      )}
                     </section>
                   );
                 })}

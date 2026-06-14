@@ -3148,6 +3148,8 @@ export default function FridgeMenuApp() {
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
   const importFileRef = useRef(null);
+  const toastTimerRef = useRef(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => { LS.set("fridge", fridge); }, [fridge]);
   useEffect(() => { LS.set("pantry", [...pantry]); }, [pantry]);
@@ -3239,7 +3241,16 @@ export default function FridgeMenuApp() {
     setCustomSeasoningInput("");
   };
 
+  const showToast = (message) => {
+    setToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2000);
+  };
+
   const addToShoppingList = (text) => {
+    if (!shoppingList.some((i) => i.text === text)) {
+      showToast(`${text}を買い物リストに追加しました`);
+    }
     setShoppingList((prev) =>
       prev.some((i) => i.text === text) ? prev : [...prev, { text, bought: false }]
     );
@@ -4829,6 +4840,21 @@ export default function FridgeMenuApp() {
           style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "1rem", cursor: "zoom-out" }}>
           <img src={lightboxPhoto} alt="料理の写真"
             style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "0.5rem" }} />
+        </div>
+      )}
+
+      {/* トースト通知 */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "1.5rem", left: "50%", transform: "translateX(-50%)",
+          backgroundColor: "rgba(30,45,38,0.96)", border: `1px solid ${COLORS.border}`,
+          color: COLORS.chalk, borderRadius: "2rem", padding: "0.55rem 1.1rem",
+          fontSize: "0.8rem", fontFamily: BODY_FONT, zIndex: 200,
+          whiteSpace: "nowrap", boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          pointerEvents: "none", display: "flex", alignItems: "center", gap: "0.4rem",
+        }}>
+          <ShoppingCart size={13} style={{ color: COLORS.accent }} />
+          {toast}
         </div>
       )}
     </div>

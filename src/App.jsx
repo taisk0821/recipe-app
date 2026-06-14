@@ -3104,7 +3104,7 @@ const NAV_ITEMS = [
   { page: "feedback",  label: "フィードバック",  icon: MessageSquare },
 ];
 
-export default function FridgeMenuApp() {
+function FridgeMenuApp() {
   const [fridge, setFridge] = useState(() => LS.get("fridge", {}));
   const [useSoon, setUseSoon] = useState(new Set());
   const [pantry, setPantry] = useState(() => new Set(LS.get("pantry", DEFAULT_SEASONINGS)));
@@ -3151,25 +3151,14 @@ export default function FridgeMenuApp() {
   const [selectedDay, setSelectedDay] = useState(null);
 
   const [feedbackText, setFeedbackText] = useState("");
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
   const importFileRef = useRef(null);
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState(null);
-
-  useEffect(() => {
-    if (currentPage !== "feedback") return;
-    setFeedbackLoading(true);
-    fetch("/api/feedback")
-      .then((r) => r.json())
-      .then((data) => setFeedbacks(data.feedbacks ?? []))
-      .catch(() => {})
-      .finally(() => setFeedbackLoading(false));
-  }, [currentPage]);
 
   useEffect(() => { LS.set("fridge", fridge); }, [fridge]);
   useEffect(() => { LS.set("pantry", [...pantry]); }, [pantry]);
@@ -3399,9 +3388,9 @@ export default function FridgeMenuApp() {
         body: JSON.stringify({ message: feedbackText.trim() }),
       });
       if (!r.ok) return;
-      const { feedback } = await r.json();
-      setFeedbacks((prev) => [feedback, ...prev]);
       setFeedbackText("");
+      setFeedbackSent(true);
+      setTimeout(() => setFeedbackSent(false), 4000);
     } catch {
       // ignore
     } finally {
@@ -4974,61 +4963,42 @@ export default function FridgeMenuApp() {
               <h1 style={{ fontFamily: DISPLAY_FONT, fontSize: "2rem", color: COLORS.chalk }}>フィードバック</h1>
             </div>
 
-            <div className="p-4 rounded-xl mb-6" style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-              <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
-                アプリへのご意見・ご要望をお気軽にどうぞ。
-              </p>
-              <textarea
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="ご意見・ご要望を入力してください..."
-                rows={4}
-                style={{
-                  width: "100%", backgroundColor: COLORS.bg, color: COLORS.chalk,
-                  border: `1px solid ${COLORS.border}`, borderRadius: "0.5rem",
-                  padding: "0.75rem", fontSize: "0.875rem", fontFamily: BODY_FONT,
-                  resize: "vertical", outline: "none", boxSizing: "border-box",
-                }}
-              />
-              <button
-                onClick={submitFeedback}
-                disabled={!feedbackText.trim() || feedbackSubmitting}
-                className="chalk-btn w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 mt-3"
-                style={{
-                  backgroundColor: feedbackText.trim() && !feedbackSubmitting ? COLORS.accent : COLORS.border,
-                  color: feedbackText.trim() && !feedbackSubmitting ? COLORS.bg : COLORS.muted,
-                  cursor: feedbackText.trim() && !feedbackSubmitting ? "pointer" : "not-allowed",
-                }}
-              >
-                <Send size={14} />
-                {feedbackSubmitting ? "送信中..." : "送信する"}
-              </button>
-            </div>
-
-            <h2 className="text-sm font-bold mb-3" style={{ color: COLORS.muted, fontFamily: MONO_FONT, letterSpacing: "0.08em" }}>
-              FEEDBACK LOG
-            </h2>
-
-            {feedbackLoading ? (
-              <p className="text-sm text-center py-8" style={{ color: COLORS.muted }}>読み込み中...</p>
-            ) : feedbacks.length === 0 ? (
-              <p className="text-sm text-center py-8" style={{ color: COLORS.muted }}>まだフィードバックはありません。</p>
+            {feedbackSent ? (
+              <div className="p-5 rounded-xl text-center" style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.accent}` }}>
+                <p className="text-2xl mb-2">✉️</p>
+                <p className="text-sm font-bold mb-1" style={{ color: COLORS.accent }}>送信しました！</p>
+                <p className="text-xs" style={{ color: COLORS.muted }}>ご意見ありがとうございます。</p>
+              </div>
             ) : (
-              <div className="flex flex-col gap-3">
-                {feedbacks.map((fb) => (
-                  <div key={fb.id} className="p-4 rounded-xl"
-                    style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-                    <p className="text-xs mb-2" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
-                      {new Date(fb.created_at).toLocaleString("ja-JP", {
-                        year: "numeric", month: "2-digit", day: "2-digit",
-                        hour: "2-digit", minute: "2-digit",
-                      })}
-                    </p>
-                    <p className="text-sm" style={{ color: COLORS.chalk, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                      {fb.message}
-                    </p>
-                  </div>
-                ))}
+              <div className="p-4 rounded-xl" style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+                <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
+                  アプリへのご意見・ご要望をお気軽にどうぞ。
+                </p>
+                <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="ご意見・ご要望を入力してください..."
+                  rows={5}
+                  style={{
+                    width: "100%", backgroundColor: COLORS.bg, color: COLORS.chalk,
+                    border: `1px solid ${COLORS.border}`, borderRadius: "0.5rem",
+                    padding: "0.75rem", fontSize: "0.875rem", fontFamily: BODY_FONT,
+                    resize: "vertical", outline: "none", boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  onClick={submitFeedback}
+                  disabled={!feedbackText.trim() || feedbackSubmitting}
+                  className="chalk-btn w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 mt-3"
+                  style={{
+                    backgroundColor: feedbackText.trim() && !feedbackSubmitting ? COLORS.accent : COLORS.border,
+                    color: feedbackText.trim() && !feedbackSubmitting ? COLORS.bg : COLORS.muted,
+                    cursor: feedbackText.trim() && !feedbackSubmitting ? "pointer" : "not-allowed",
+                  }}
+                >
+                  <Send size={14} />
+                  {feedbackSubmitting ? "送信中..." : "送信する"}
+                </button>
               </div>
             )}
           </>
@@ -5063,4 +5033,162 @@ export default function FridgeMenuApp() {
       )}
     </div>
   );
+}
+
+// ─── 管理者ページ ───────────────────────────────────────────
+const ADMIN_PATH = "/b9fd3c7a";
+
+function AdminPage() {
+  const [pw, setPw] = useState("");
+  const [authed, setAuthed] = useState(false);
+  const [authError, setAuthError] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [deleting, setDeleting] = useState(null);
+
+  const callAdmin = async (body) => {
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return r;
+  };
+
+  const login = async () => {
+    if (!pw.trim()) return;
+    setLoading(true);
+    setAuthError(false);
+    try {
+      const r = await callAdmin({ action: "list", password: pw });
+      if (r.status === 401) { setAuthError(true); return; }
+      const data = await r.json();
+      setFeedbacks(data.feedbacks ?? []);
+      setAuthed(true);
+    } catch {
+      setAuthError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteFeedback = async (id, preview) => {
+    if (!window.confirm(`このフィードバックを削除しますか？\n\n「${preview}」`)) return;
+    setDeleting(id);
+    try {
+      await callAdmin({ action: "delete", password: pw, id });
+      setFeedbacks((prev) => prev.filter((f) => f.id !== id));
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const bg = "#2E3D36", surface = "#384E45", chalk = "#F4F1E8",
+        accent = "#F2C14E", muted = "#8FAF9B", border = "rgba(255,255,255,0.1)";
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: bg, color: chalk, padding: "2rem 1rem", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ maxWidth: "480px", margin: "0 auto" }}>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "2rem", color: accent }}>
+          管理者ページ
+        </h1>
+
+        {!authed ? (
+          <div style={{ backgroundColor: surface, border: `1px solid ${border}`, borderRadius: "0.75rem", padding: "1.5rem" }}>
+            <p style={{ fontSize: "0.875rem", color: muted, marginBottom: "1rem" }}>パスワードを入力してください</p>
+            <input
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && login()}
+              placeholder="パスワード"
+              autoFocus
+              style={{
+                width: "100%", backgroundColor: bg, color: chalk,
+                border: `1px solid ${authError ? "#E8744A" : border}`,
+                borderRadius: "0.5rem", padding: "0.65rem 0.75rem",
+                fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem",
+              }}
+            />
+            {authError && (
+              <p style={{ fontSize: "0.8rem", color: "#E8744A", marginBottom: "0.75rem" }}>
+                パスワードが正しくありません
+              </p>
+            )}
+            <button
+              onClick={login}
+              disabled={loading || !pw.trim()}
+              style={{
+                width: "100%", padding: "0.65rem",
+                backgroundColor: pw.trim() && !loading ? accent : border,
+                color: pw.trim() && !loading ? bg : muted,
+                border: "none", borderRadius: "0.5rem",
+                fontSize: "0.875rem", fontWeight: "bold", cursor: "pointer",
+              }}
+            >
+              {loading ? "認証中..." : "ログイン"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <p style={{ fontSize: "0.875rem", color: muted }}>
+                {feedbacks.length} 件のフィードバック
+              </p>
+              <button
+                onClick={() => { setAuthed(false); setPw(""); setFeedbacks([]); }}
+                style={{ fontSize: "0.75rem", color: muted, background: "none", border: "none", cursor: "pointer" }}
+              >
+                ログアウト
+              </button>
+            </div>
+
+            {feedbacks.length === 0 ? (
+              <p style={{ textAlign: "center", color: muted, padding: "3rem 0" }}>フィードバックはまだありません</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {feedbacks.map((fb) => (
+                  <div key={fb.id}
+                    style={{ backgroundColor: surface, border: `1px solid ${border}`, borderRadius: "0.75rem", padding: "1rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
+                      <p style={{ fontSize: "0.75rem", color: muted, fontFamily: "monospace" }}>
+                        #{fb.id} · {new Date(fb.created_at).toLocaleString("ja-JP", {
+                          year: "numeric", month: "2-digit", day: "2-digit",
+                          hour: "2-digit", minute: "2-digit",
+                        })}
+                      </p>
+                      <button
+                        onClick={() => deleteFeedback(fb.id, fb.message.slice(0, 30))}
+                        disabled={deleting === fb.id}
+                        style={{
+                          fontSize: "0.75rem", color: deleting === fb.id ? muted : "#E8744A",
+                          background: "none", border: `1px solid ${deleting === fb.id ? border : "#E8744A"}`,
+                          borderRadius: "0.4rem", padding: "0.2rem 0.55rem",
+                          cursor: deleting === fb.id ? "not-allowed" : "pointer",
+                          flexShrink: 0, marginLeft: "0.5rem",
+                        }}
+                      >
+                        {deleting === fb.id ? "削除中…" : "削除"}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: "0.875rem", color: chalk, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
+                      {fb.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── エントリポイント ────────────────────────────────────────
+export default function App() {
+  if (typeof window !== "undefined" && window.location.pathname === ADMIN_PATH) {
+    return <AdminPage />;
+  }
+  return <FridgeMenuApp />;
 }

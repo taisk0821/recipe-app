@@ -1,6 +1,10 @@
 import { neon } from "@neondatabase/serverless";
 
 export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   const sql = neon(process.env.DATABASE_URL);
 
   await sql`
@@ -11,25 +15,14 @@ export default async function handler(req, res) {
     )
   `;
 
-  if (req.method === "GET") {
-    const rows = await sql`
-      SELECT id, message, created_at FROM feedbacks ORDER BY created_at DESC
-    `;
-    return res.status(200).json({ feedbacks: rows });
+  const { message } = req.body ?? {};
+  if (!message?.trim()) {
+    return res.status(400).json({ error: "メッセージが空です" });
   }
-
-  if (req.method === "POST") {
-    const { message } = req.body ?? {};
-    if (!message?.trim()) {
-      return res.status(400).json({ error: "メッセージが空です" });
-    }
-    const [row] = await sql`
-      INSERT INTO feedbacks (message)
-      VALUES (${message.trim()})
-      RETURNING id, message, created_at
-    `;
-    return res.status(201).json({ feedback: row });
-  }
-
-  res.status(405).json({ error: "Method not allowed" });
+  const [row] = await sql`
+    INSERT INTO feedbacks (message)
+    VALUES (${message.trim()})
+    RETURNING id, message, created_at
+  `;
+  return res.status(201).json({ feedback: row });
 }

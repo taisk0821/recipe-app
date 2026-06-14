@@ -4,6 +4,7 @@ import {
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
   Trash2, Camera, ImageOff, Menu, ChevronLeft, ChevronDown, ChevronUp,
   HardDrive, Download, Upload, Home, Search, CalendarDays,
+  MessageSquare, Send,
 } from "lucide-react";
 
 const COLORS = {
@@ -3095,11 +3096,12 @@ const LS = {
 };
 
 const NAV_ITEMS = [
-  { page: "pantry",   label: "調味料棚",     icon: Soup },
-  { page: "shopping", label: "買い物リスト",  icon: ShoppingCart },
-  { page: "history",  label: "履歴",          icon: History,      tab: "list" },
-  { page: "history",  label: "カレンダー",    icon: CalendarDays, tab: "calendar" },
-  { page: "data",     label: "データ管理",    icon: HardDrive },
+  { page: "pantry",    label: "調味料棚",       icon: Soup },
+  { page: "shopping",  label: "買い物リスト",    icon: ShoppingCart },
+  { page: "history",   label: "履歴",            icon: History,       tab: "list" },
+  { page: "history",   label: "カレンダー",      icon: CalendarDays,  tab: "calendar" },
+  { page: "data",      label: "データ管理",      icon: HardDrive },
+  { page: "feedback",  label: "フィードバック",  icon: MessageSquare },
 ];
 
 export default function FridgeMenuApp() {
@@ -3145,11 +3147,26 @@ export default function FridgeMenuApp() {
   });
   const [selectedDay, setSelectedDay] = useState(null);
 
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
   const importFileRef = useRef(null);
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (currentPage !== "feedback") return;
+    setFeedbackLoading(true);
+    fetch("/api/feedback")
+      .then((r) => r.json())
+      .then((data) => setFeedbacks(data.feedbacks ?? []))
+      .catch(() => {})
+      .finally(() => setFeedbackLoading(false));
+  }, [currentPage]);
 
   useEffect(() => { LS.set("fridge", fridge); }, [fridge]);
   useEffect(() => { LS.set("pantry", [...pantry]); }, [pantry]);
@@ -3324,6 +3341,26 @@ export default function FridgeMenuApp() {
     setCurrentPage(page);
     if (tab) { setHistoryView(tab); setSelectedDay(null); }
     setSideMenuOpen(false);
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackText.trim() || feedbackSubmitting) return;
+    setFeedbackSubmitting(true);
+    try {
+      const r = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: feedbackText.trim() }),
+      });
+      if (!r.ok) return;
+      const { feedback } = await r.json();
+      setFeedbacks((prev) => [feedback, ...prev]);
+      setFeedbackText("");
+    } catch {
+      // ignore
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   };
 
   const exportData = () => {
@@ -4827,6 +4864,74 @@ export default function FridgeMenuApp() {
 
             <input ref={importFileRef} type="file" accept="application/json,.json"
               onChange={handleImport} style={{ display: "none" }} aria-hidden="true" />
+          </>
+        )}
+
+        {/* ── FEEDBACK ── */}
+        {currentPage === "feedback" && (
+          <>
+            <div className="flex items-center gap-2 mb-6">
+              <MessageSquare size={20} style={{ color: COLORS.accent }} />
+              <h1 style={{ fontFamily: DISPLAY_FONT, fontSize: "2rem", color: COLORS.chalk }}>フィードバック</h1>
+            </div>
+
+            <div className="p-4 rounded-xl mb-6" style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+              <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
+                アプリへのご意見・ご要望をお気軽にどうぞ。
+              </p>
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="ご意見・ご要望を入力してください..."
+                rows={4}
+                style={{
+                  width: "100%", backgroundColor: COLORS.bg, color: COLORS.chalk,
+                  border: `1px solid ${COLORS.border}`, borderRadius: "0.5rem",
+                  padding: "0.75rem", fontSize: "0.875rem", fontFamily: BODY_FONT,
+                  resize: "vertical", outline: "none", boxSizing: "border-box",
+                }}
+              />
+              <button
+                onClick={submitFeedback}
+                disabled={!feedbackText.trim() || feedbackSubmitting}
+                className="chalk-btn w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 mt-3"
+                style={{
+                  backgroundColor: feedbackText.trim() && !feedbackSubmitting ? COLORS.accent : COLORS.border,
+                  color: feedbackText.trim() && !feedbackSubmitting ? COLORS.bg : COLORS.muted,
+                  cursor: feedbackText.trim() && !feedbackSubmitting ? "pointer" : "not-allowed",
+                }}
+              >
+                <Send size={14} />
+                {feedbackSubmitting ? "送信中..." : "送信する"}
+              </button>
+            </div>
+
+            <h2 className="text-sm font-bold mb-3" style={{ color: COLORS.muted, fontFamily: MONO_FONT, letterSpacing: "0.08em" }}>
+              FEEDBACK LOG
+            </h2>
+
+            {feedbackLoading ? (
+              <p className="text-sm text-center py-8" style={{ color: COLORS.muted }}>読み込み中...</p>
+            ) : feedbacks.length === 0 ? (
+              <p className="text-sm text-center py-8" style={{ color: COLORS.muted }}>まだフィードバックはありません。</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {feedbacks.map((fb) => (
+                  <div key={fb.id} className="p-4 rounded-xl"
+                    style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+                    <p className="text-xs mb-2" style={{ color: COLORS.muted, fontFamily: MONO_FONT }}>
+                      {new Date(fb.created_at).toLocaleString("ja-JP", {
+                        year: "numeric", month: "2-digit", day: "2-digit",
+                        hour: "2-digit", minute: "2-digit",
+                      })}
+                    </p>
+                    <p className="text-sm" style={{ color: COLORS.chalk, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {fb.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 

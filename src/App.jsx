@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
-  Trash2, Camera, ImageOff, Menu, ChevronLeft,
+  Trash2, Camera, ImageOff, Menu, ChevronLeft, ChevronDown, ChevronUp,
   HardDrive, Download, Upload, Home, Search, CalendarDays,
 } from "lucide-react";
 
@@ -349,6 +349,13 @@ const ALL_INGREDIENTS = [
   "こんにゃく", "切り干し大根", "ひじき", "きゅうり",
   "春雨",
   "パン",
+];
+
+const INGREDIENT_CATEGORIES = [
+  { label: "肉・魚介", items: ["豚肉", "鶏肉", "牛肉", "ひき肉", "鮭", "えび", "ぶり", "さば", "ツナ"] },
+  { label: "野菜", items: ["キャベツ", "にんじん", "玉ねぎ", "ねぎ", "じゃがいも", "トマト", "なす", "もやし", "ほうれん草", "大根", "白菜", "小松菜", "ブロッコリー", "ピーマン", "きゅうり", "かぼちゃ", "れんこん", "ごぼう", "にら"] },
+  { label: "麺・ご飯・パン", items: ["ごはん", "うどん", "中華麺", "そうめん", "スパゲッティ", "そば", "米", "春雨", "パン"] },
+  { label: "卵・豆腐・加工品", items: ["卵", "牛乳", "ベーコン", "ウインナー", "豆腐", "納豆", "キムチ", "厚揚げ", "ちくわ", "油揚げ", "こんにゃく", "切り干し大根", "ひじき"] },
 ];
 
 const RECIPES = [
@@ -3101,7 +3108,8 @@ export default function FridgeMenuApp() {
   const [pantry, setPantry] = useState(() => new Set(LS.get("pantry", DEFAULT_SEASONINGS)));
   const [servings, setServings] = useState(() => LS.get("servings", 2));
   const [moodFilter, setMoodFilter] = useState(null);
-  const [customInput, setCustomInput] = useState("");
+  const [ingSearch, setIngSearch] = useState("");
+  const [openCategories, setOpenCategories] = useState(new Set());
   const [hasDecided, setHasDecided] = useState(false);
   const [randomPick, setRandomPick] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -3223,12 +3231,6 @@ export default function FridgeMenuApp() {
       const cur = prev[name] || 0;
       return { ...prev, [name]: Math.max(step, cur + delta * step) };
     });
-  };
-
-  const addCustom = () => {
-    const value = customInput.trim();
-    if (value && !(value in fridge)) setFridge((prev) => ({ ...prev, [value]: true }));
-    setCustomInput("");
   };
 
   const addCustomSeasoning = () => {
@@ -3756,30 +3758,96 @@ export default function FridgeMenuApp() {
             {/* 食材追加 */}
             <section className="mb-6">
               <h2 className="text-sm font-bold mb-3">食材を追加する</h2>
-              <div className="flex flex-wrap gap-2">
-                {ALL_INGREDIENTS.filter((ing) => !(ing in fridge)).map((ing) => (
-                  <button key={ing} onClick={() => toggleIngredient(ing)}
-                    className="chip chalk-btn px-3 py-1.5 rounded-full text-sm border flex items-center gap-1"
-                    style={{ backgroundColor: "transparent", color: COLORS.chalk, borderColor: COLORS.border }}>
-                    <Plus size={12} />
-                    {ing}
-                  </button>
-                ))}
+
+              {/* 検索ボックス */}
+              <div className="relative mb-3">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: COLORS.muted }} />
+                <input
+                  value={ingSearch}
+                  onChange={(e) => setIngSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const v = ingSearch.trim();
+                      if (v && !(v in fridge)) { setFridge((prev) => ({ ...prev, [v]: true })); setIngSearch(""); }
+                    }
+                  }}
+                  placeholder="食材を検索または入力"
+                  className="w-full pl-8 pr-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.chalk, fontFamily: BODY_FONT }}
+                />
               </div>
-              <div className="flex gap-2 mt-3">
-                <input value={customInput}
-                  onChange={(e) => setCustomInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addCustom()}
-                  placeholder="その他の食材を入力"
-                  className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.chalk, fontFamily: BODY_FONT }} />
-                <button onClick={addCustom}
-                  className="chalk-btn px-3 py-2 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}` }}
-                  aria-label="食材を追加">
-                  <Plus size={18} style={{ color: COLORS.chalk }} />
-                </button>
-              </div>
+
+              {ingSearch.trim() ? (
+                /* 検索結果 */
+                (() => {
+                  const v = ingSearch.trim();
+                  const filtered = ALL_INGREDIENTS.filter(ing => !(ing in fridge) && ing.includes(v));
+                  const alreadyHave = v in fridge;
+                  const showCustomAdd = filtered.length === 0 && !alreadyHave;
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {filtered.map(ing => (
+                        <button key={ing} onClick={() => { toggleIngredient(ing); setIngSearch(""); }}
+                          className="chip chalk-btn px-3 py-1.5 rounded-full text-sm border flex items-center gap-1"
+                          style={{ backgroundColor: "transparent", color: COLORS.chalk, borderColor: COLORS.border }}>
+                          <Plus size={12} />{ing}
+                        </button>
+                      ))}
+                      {showCustomAdd && (
+                        <button onClick={() => { const v2 = ingSearch.trim(); setFridge((prev) => ({ ...prev, [v2]: true })); setIngSearch(""); }}
+                          className="chip chalk-btn px-3 py-1.5 rounded-full text-sm border flex items-center gap-1"
+                          style={{ backgroundColor: "transparent", color: COLORS.accent, borderColor: COLORS.accent }}>
+                          <Plus size={12} />「{v}」を追加
+                        </button>
+                      )}
+                      {filtered.length === 0 && alreadyHave && (
+                        <p className="text-xs py-1" style={{ color: COLORS.muted }}>すでに冷蔵庫にあります</p>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : (
+                /* カテゴリ別 */
+                <div className="flex flex-col gap-2">
+                  {INGREDIENT_CATEGORIES.map(({ label, items }) => {
+                    const available = items.filter(ing => !(ing in fridge));
+                    if (available.length === 0) return null;
+                    const isOpen = openCategories.has(label);
+                    return (
+                      <div key={label} className="rounded-lg overflow-hidden"
+                        style={{ border: `1px solid ${COLORS.border}` }}>
+                        <button
+                          onClick={() => setOpenCategories(prev => {
+                            const next = new Set(prev);
+                            if (next.has(label)) next.delete(label); else next.add(label);
+                            return next;
+                          })}
+                          className="w-full flex items-center justify-between px-3 py-2.5 text-sm"
+                          style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk }}>
+                          <span className="font-bold">
+                            {label}
+                            <span className="font-normal text-xs ml-1.5" style={{ color: COLORS.muted }}>{available.length}種</span>
+                          </span>
+                          {isOpen
+                            ? <ChevronUp size={16} style={{ color: COLORS.muted }} />
+                            : <ChevronDown size={16} style={{ color: COLORS.muted }} />}
+                        </button>
+                        {isOpen && (
+                          <div className="flex flex-wrap gap-2 p-3" style={{ backgroundColor: COLORS.surface }}>
+                            {available.map(ing => (
+                              <button key={ing} onClick={() => toggleIngredient(ing)}
+                                className="chip chalk-btn px-3 py-1.5 rounded-full text-sm border flex items-center gap-1"
+                                style={{ backgroundColor: "transparent", color: COLORS.chalk, borderColor: COLORS.border }}>
+                                <Plus size={12} />{ing}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
 
             {/* 決定ボタン */}

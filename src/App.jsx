@@ -3123,10 +3123,13 @@ export default function FridgeMenuApp() {
     return LS.get("history", []).map((h) => ({ ...h, uid: h.uid ?? --t, at: new Date(h.at) }));
   });
   const [shoppingList, setShoppingList] = useState(() =>
-    LS.get("shoppingList", []).map((item) =>
-      typeof item === "string" ? { text: item, bought: false } : item
-    )
+    LS.get("shoppingList", []).map((item) => {
+      if (typeof item === "string") return { text: item, bought: false, qty: 1 };
+      return { ...item, qty: item.qty ?? 1 };
+    })
   );
+  const [editingShoppingId, setEditingShoppingId] = useState(null);
+  const [editingShoppingValue, setEditingShoppingValue] = useState("");
   const [shoppingInput, setShoppingInput] = useState("");
   const [shoppingMemo, setShoppingMemo] = useState(() => LS.get("shoppingMemo", ""));
   const [ratings, setRatings] = useState(() => LS.get("ratings", {}));
@@ -3265,12 +3268,16 @@ export default function FridgeMenuApp() {
   };
 
   const addToShoppingList = (text) => {
-    if (!shoppingList.some((i) => i.text === text)) {
+    setShoppingList((prev) => {
+      const idx = prev.findIndex((i) => i.text === text);
+      if (idx !== -1) {
+        const newQty = prev[idx].qty + 1;
+        showToast(`${text} ×${newQty}`);
+        return prev.map((i, n) => n === idx ? { ...i, qty: newQty } : i);
+      }
       showToast(`${text}を買い物リストに追加しました`);
-    }
-    setShoppingList((prev) =>
-      prev.some((i) => i.text === text) ? prev : [...prev, { text, bought: false }]
-    );
+      return [...prev, { text, bought: false, qty: 1 }];
+    });
   };
 
   const addAllMissingToShopping = (details) => {
@@ -3287,11 +3294,50 @@ export default function FridgeMenuApp() {
     );
   };
 
+  const changeShoppingQty = (text, delta) => {
+    setShoppingList((prev) => {
+      const idx = prev.findIndex((i) => i.text === text);
+      if (idx === -1) return prev;
+      const newQty = prev[idx].qty + delta;
+      if (newQty <= 0) return prev.filter((_, n) => n !== idx);
+      return prev.map((i, n) => n === idx ? { ...i, qty: newQty } : i);
+    });
+  };
+
+  const startEditShopping = (item) => {
+    setEditingShoppingId(item.text);
+    setEditingShoppingValue(item.text);
+  };
+
+  const saveShoppingEdit = (oldText) => {
+    const newText = editingShoppingValue.trim();
+    setEditingShoppingId(null);
+    if (!newText || newText === oldText) return;
+    setShoppingList((prev) => {
+      const selfIdx = prev.findIndex((i) => i.text === oldText);
+      if (selfIdx === -1) return prev;
+      const dupIdx = prev.findIndex((i) => i.text === newText);
+      if (dupIdx !== -1) {
+        // merge: add self qty into the duplicate, remove self
+        const selfQty = prev[selfIdx].qty;
+        return prev
+          .filter((_, n) => n !== selfIdx)
+          .map((i) => i.text === newText ? { ...i, qty: i.qty + selfQty } : i);
+      }
+      return prev.map((i) => i.text === oldText ? { ...i, text: newText } : i);
+    });
+  };
+
   const addShoppingItem = () => {
     const value = shoppingInput.trim();
-    if (value && !shoppingList.some((i) => i.text === value)) {
-      setShoppingList((prev) => [...prev, { text: value, bought: false }]);
-    }
+    if (!value) return;
+    setShoppingList((prev) => {
+      const idx = prev.findIndex((i) => i.text === value);
+      if (idx !== -1) {
+        return prev.map((i, n) => n === idx ? { ...i, qty: i.qty + 1 } : i);
+      }
+      return [...prev, { text: value, bought: false, qty: 1 }];
+    });
     setShoppingInput("");
   };
 
@@ -3403,9 +3449,10 @@ export default function FridgeMenuApp() {
           setHistory(data.history.map((h) => ({ ...h, uid: h.uid ?? --t, at: new Date(h.at) })));
         }
         if (data.shoppingList !== undefined) {
-          setShoppingList(data.shoppingList.map((item) =>
-            typeof item === "string" ? { text: item, bought: false } : item
-          ));
+          setShoppingList(data.shoppingList.map((item) => {
+            if (typeof item === "string") return { text: item, bought: false, qty: 1 };
+            return { ...item, qty: item.qty ?? 1 };
+          }));
         }
         if (data.shoppingMemo !== undefined) setShoppingMemo(data.shoppingMemo);
         if (data.ratings !== undefined) setRatings(data.ratings);
@@ -4533,13 +4580,14 @@ export default function FridgeMenuApp() {
             ) : (
               <div className="flex flex-col gap-2 mb-6">
                 {shoppingList.map((item) => (
-                  <div key={item.text} className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                  <div key={item.text} className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
                     style={{
                       backgroundColor: COLORS.surface,
-                      border: `1px solid ${item.bought ? COLORS.border : COLORS.border}`,
+                      border: `1px solid ${COLORS.border}`,
                       opacity: item.bought ? 0.5 : 1,
                       transition: "opacity 0.2s ease",
                     }}>
+                    {/* 購入チェック */}
                     <button onClick={() => toggleBought(item.text)}
                       className="chalk-btn flex-shrink-0 flex items-center justify-center rounded-full"
                       style={{
@@ -4554,13 +4602,64 @@ export default function FridgeMenuApp() {
                         </svg>
                       )}
                     </button>
-                    <span className="text-sm flex-1"
-                      style={{ textDecoration: item.bought ? "line-through" : "none", color: COLORS.chalk }}>
-                      {item.text}
-                    </span>
+
+                    {/* テキスト or 編集フォーム */}
+                    {editingShoppingId === item.text ? (
+                      <input
+                        autoFocus
+                        value={editingShoppingValue}
+                        onChange={(e) => setEditingShoppingValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveShoppingEdit(item.text);
+                          if (e.key === "Escape") setEditingShoppingId(null);
+                        }}
+                        onBlur={() => saveShoppingEdit(item.text)}
+                        className="flex-1 text-sm px-2 py-0.5 rounded outline-none"
+                        style={{ backgroundColor: COLORS.bg, color: COLORS.chalk, border: `1px solid ${COLORS.accent}`, fontFamily: BODY_FONT, minWidth: 0 }}
+                      />
+                    ) : (
+                      <button
+                        className="flex-1 text-left text-sm"
+                        style={{
+                          textDecoration: item.bought ? "line-through" : "none",
+                          color: COLORS.chalk, fontFamily: BODY_FONT,
+                          background: "none", border: "none", cursor: "text", padding: 0,
+                          minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}
+                        onClick={() => !item.bought && startEditShopping(item)}
+                        aria-label={`${item.text}を編集`}>
+                        {item.text}
+                        {item.qty >= 2 && (
+                          <span style={{ marginLeft: "0.35rem", color: COLORS.accent, fontFamily: MONO_FONT, fontSize: "0.8rem" }}>
+                            ×{item.qty}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
+                    {/* 数量コントロール */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => changeShoppingQty(item.text, -1)}
+                        className="chalk-btn flex items-center justify-center rounded-full"
+                        style={{ width: "1.6rem", height: "1.6rem", backgroundColor: COLORS.surfaceAlt }}
+                        aria-label={`${item.text}を減らす`}>
+                        <Minus size={11} style={{ color: COLORS.chalk }} />
+                      </button>
+                      <span style={{ fontFamily: MONO_FONT, fontSize: "0.75rem", minWidth: "1rem", textAlign: "center", color: COLORS.chalk }}>
+                        {item.qty}
+                      </span>
+                      <button onClick={() => changeShoppingQty(item.text, 1)}
+                        className="chalk-btn flex items-center justify-center rounded-full"
+                        style={{ width: "1.6rem", height: "1.6rem", backgroundColor: COLORS.surfaceAlt }}
+                        aria-label={`${item.text}を増やす`}>
+                        <Plus size={11} style={{ color: COLORS.chalk }} />
+                      </button>
+                    </div>
+
+                    {/* 削除 */}
                     <button onClick={() => removeFromShoppingList(item.text)}
                       className="chalk-btn flex-shrink-0" aria-label={`${item.text}をリストから削除`}>
-                      <X size={15} style={{ color: COLORS.muted }} />
+                      <X size={14} style={{ color: COLORS.muted }} />
                     </button>
                   </div>
                 ))}

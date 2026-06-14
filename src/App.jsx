@@ -4,7 +4,7 @@ import {
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
   Trash2, Camera, ImageOff, Menu, ChevronLeft, ChevronDown, ChevronUp,
   HardDrive, Download, Upload, Home, Search, CalendarDays,
-  MessageSquare, Send,
+  MessageSquare, Send, Timer,
 } from "lucide-react";
 
 const COLORS = {
@@ -3095,11 +3095,81 @@ const LS = {
   },
 };
 
+// ── タイマーユーティリティ ──────────────────────────────────
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [[0, 0.18], [0.28, 0.18], [0.56, 0.28]].forEach(([offset, dur]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.35, ctx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + dur);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + dur + 0.02);
+    });
+  } catch {}
+}
+
+// 手順テキスト内の時間表記を検出して [分, 秒] に変換
+const TIME_RE = /(\d+)分(\d+)秒|(\d+)[〜~ー](\d+)分|(\d+)分|(\d+)秒/g;
+
+function parseTimeText(text) {
+  const segments = [];
+  let last = 0;
+  for (const m of text.matchAll(TIME_RE)) {
+    if (m.index > last) segments.push({ type: "text", content: text.slice(last, m.index) });
+    let secs = 0;
+    if (m[1] !== undefined) secs = parseInt(m[1]) * 60 + parseInt(m[2]); // X分Y秒
+    else if (m[3] !== undefined) secs = parseInt(m[4]) * 60;              // X〜Y分（大きい方）
+    else if (m[5] !== undefined) secs = parseInt(m[5]) * 60;              // X分
+    else if (m[6] !== undefined) secs = parseInt(m[6]);                   // X秒
+    segments.push(secs > 0
+      ? { type: "time", content: m[0], seconds: secs }
+      : { type: "text", content: m[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segments.push({ type: "text", content: text.slice(last) });
+  return segments;
+}
+
+function StepText({ text, onStartTimer }) {
+  const segments = useMemo(() => parseTimeText(text), [text]);
+  return (
+    <>
+      {segments.map((seg, i) =>
+        seg.type === "time" ? (
+          <button
+            key={i}
+            onClick={() => onStartTimer(seg.seconds)}
+            title={`${seg.content}でタイマーをスタート`}
+            className="inline-flex items-center gap-0.5 mx-0.5 font-bold"
+            style={{
+              backgroundColor: COLORS.accent, color: COLORS.bg,
+              borderRadius: "0.35rem", padding: "0.05rem 0.45rem",
+              fontSize: "0.8rem", lineHeight: 1.6, verticalAlign: "middle",
+              cursor: "pointer", border: "none",
+            }}>
+            <Timer size={10} style={{ flexShrink: 0 }} />
+            {seg.content}
+          </button>
+        ) : (
+          <span key={i}>{seg.content}</span>
+        )
+      )}
+    </>
+  );
+}
+
 const NAV_ITEMS = [
   { page: "pantry",    label: "調味料棚",       icon: Soup },
   { page: "shopping",  label: "買い物リスト",    icon: ShoppingCart },
   { page: "history",   label: "履歴",            icon: History,       tab: "list" },
   { page: "history",   label: "カレンダー",      icon: CalendarDays,  tab: "calendar" },
+  { page: "timer",     label: "キッチンタイマー", icon: Timer },
   { page: "data",      label: "データ管理",      icon: HardDrive },
   { page: "feedback",  label: "フィードバック",  icon: MessageSquare },
 ];
@@ -3154,6 +3224,14 @@ function FridgeMenuApp() {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
 
+  // キッチンタイマー
+  const [timerMins, setTimerMins] = useState(3);
+  const [timerSecs, setTimerSecs] = useState(0);
+  const [timerRemaining, setTimerRemaining] = useState(null); // null=未開始, 0=終了, N=カウント中
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerTotal, setTimerTotal] = useState(0);
+  const timerIntervalRef = useRef(null);
+
   const fileInputRef = useRef(null);
   const pendingUidRef = useRef(null);
   const importFileRef = useRef(null);
@@ -3167,6 +3245,24 @@ function FridgeMenuApp() {
   useEffect(() => { LS.set("shoppingList", shoppingList); }, [shoppingList]);
   useEffect(() => { LS.set("shoppingMemo", shoppingMemo); }, [shoppingMemo]);
   useEffect(() => { LS.set("ratings", ratings); }, [ratings]);
+
+  useEffect(() => {
+    clearInterval(timerIntervalRef.current);
+    if (!timerRunning) return;
+    timerIntervalRef.current = setInterval(() => {
+      setTimerRemaining((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timerIntervalRef.current);
+          setTimerRunning(false);
+          playBeep();
+          if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 400]);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerIntervalRef.current);
+  }, [timerRunning]);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
@@ -3376,6 +3472,32 @@ function FridgeMenuApp() {
     setCurrentPage(page);
     if (tab) { setHistoryView(tab); setSelectedDay(null); }
     setSideMenuOpen(false);
+  };
+
+  const startTimerWith = (totalSecs) => {
+    clearInterval(timerIntervalRef.current);
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    setTimerMins(m);
+    setTimerSecs(s);
+    setTimerTotal(totalSecs);
+    setTimerRemaining(totalSecs);
+    setTimerRunning(true);
+    navigate("timer");
+  };
+
+  const handleTimerStart = () => {
+    const total = timerMins * 60 + timerSecs;
+    if (total <= 0) return;
+    setTimerTotal(total);
+    setTimerRemaining(total);
+    setTimerRunning(true);
+  };
+
+  const handleTimerReset = () => {
+    clearInterval(timerIntervalRef.current);
+    setTimerRunning(false);
+    setTimerRemaining(null);
   };
 
   const submitFeedback = async () => {
@@ -4177,7 +4299,7 @@ function FridgeMenuApp() {
                                     style={{ width: "1.4rem", height: "1.4rem", backgroundColor: COLORS.accent, color: COLORS.bg, fontFamily: MONO_FONT, fontSize: "0.7rem", fontWeight: 700 }}>
                                     {idx + 1}
                                   </span>
-                                  <span className="leading-relaxed">{step}</span>
+                                  <span className="leading-relaxed"><StepText text={step} onStartTimer={startTimerWith} /></span>
                                 </li>
                               ))}
                             </ol>
@@ -4465,7 +4587,7 @@ function FridgeMenuApp() {
                                           style={{ width: "1.4rem", height: "1.4rem", backgroundColor: COLORS.accent, color: COLORS.bg, fontFamily: MONO_FONT, fontSize: "0.7rem", fontWeight: 700 }}>
                                           {idx + 1}
                                         </span>
-                                        <span className="leading-relaxed">{step}</span>
+                                        <span className="leading-relaxed"><StepText text={step} onStartTimer={startTimerWith} /></span>
                                       </li>
                                     ))}
                                   </ol>
@@ -4954,6 +5076,147 @@ function FridgeMenuApp() {
               onChange={handleImport} style={{ display: "none" }} aria-hidden="true" />
           </>
         )}
+
+        {/* ── TIMER ── */}
+        {currentPage === "timer" && (() => {
+          const fmtTime = (s) =>
+            `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+          const radius = 88;
+          const circ = 2 * Math.PI * radius;
+          const progress = timerTotal > 0 && timerRemaining !== null
+            ? timerRemaining / timerTotal : 1;
+          const dashOffset = circ * (1 - progress);
+          const isIdle = timerRemaining === null;
+          const isDone = timerRemaining === 0;
+
+          return (
+            <>
+              <div className="flex items-center gap-2 mb-6">
+                <Timer size={20} style={{ color: COLORS.accent }} />
+                <h1 style={{ fontFamily: DISPLAY_FONT, fontSize: "2rem", color: COLORS.chalk }}>キッチンタイマー</h1>
+              </div>
+
+              {/* プログレスサークル + 時間表示 */}
+              <div className="flex justify-center mb-6">
+                <div style={{ position: "relative", width: 200, height: 200 }}>
+                  <svg width="200" height="200" style={{ transform: "rotate(-90deg)" }}>
+                    <circle cx="100" cy="100" r={radius} fill="none"
+                      stroke={COLORS.surfaceAlt} strokeWidth="10" />
+                    <circle cx="100" cy="100" r={radius} fill="none"
+                      stroke={isDone ? COLORS.accent2 : COLORS.accent} strokeWidth="10"
+                      strokeLinecap="round"
+                      strokeDasharray={circ}
+                      strokeDashoffset={isIdle ? 0 : dashOffset}
+                      style={{ transition: "stroke-dashoffset 0.6s linear, stroke 0.3s" }} />
+                  </svg>
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {isIdle ? (
+                      <span style={{ fontFamily: MONO_FONT, fontSize: "2.6rem", color: COLORS.chalk, letterSpacing: "0.05em" }}>
+                        {fmtTime(timerMins * 60 + timerSecs)}
+                      </span>
+                    ) : isDone ? (
+                      <>
+                        <span style={{ fontSize: "2rem" }}>🔔</span>
+                        <span style={{ fontFamily: BODY_FONT, fontSize: "1.1rem", color: COLORS.accent2, fontWeight: "bold", marginTop: "0.25rem" }}>完了！</span>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontFamily: MONO_FONT, fontSize: "2.6rem", color: COLORS.chalk, letterSpacing: "0.05em" }}>
+                          {fmtTime(timerRemaining)}
+                        </span>
+                        <span style={{ fontFamily: MONO_FONT, fontSize: "0.65rem", color: COLORS.muted, marginTop: "0.15rem" }}>
+                          /{fmtTime(timerTotal)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 分・秒セレクタ（未開始時のみ） */}
+              {isIdle && (
+                <>
+                  <div className="flex items-center justify-center gap-6 mb-5">
+                    {[
+                      { label: "分", val: timerMins, set: setTimerMins, max: 99, wrap: false },
+                      { label: "秒", val: timerSecs, set: setTimerSecs, max: 59, wrap: true },
+                    ].map(({ label, val, set, max, wrap }) => (
+                      <div key={label} className="flex flex-col items-center gap-1">
+                        <span className="text-xs" style={{ color: COLORS.muted }}>{label}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="chalk-btn flex items-center justify-center rounded-full"
+                            style={{ width: "2rem", height: "2rem", backgroundColor: COLORS.surfaceAlt }}
+                            onClick={() => set((v) => wrap ? (v <= 0 ? max : v - 1) : Math.max(0, v - 1))}>
+                            <Minus size={14} style={{ color: COLORS.chalk }} />
+                          </button>
+                          <span style={{ fontFamily: MONO_FONT, fontSize: "2rem", minWidth: "2.8rem", textAlign: "center", color: COLORS.chalk }}>
+                            {String(val).padStart(2, "0")}
+                          </span>
+                          <button
+                            className="chalk-btn flex items-center justify-center rounded-full"
+                            style={{ width: "2rem", height: "2rem", backgroundColor: COLORS.surfaceAlt }}
+                            onClick={() => set((v) => wrap ? (v >= max ? 0 : v + 1) : Math.min(max, v + 1))}>
+                            <Plus size={14} style={{ color: COLORS.chalk }} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* クイックプリセット */}
+                  <div className="flex flex-wrap gap-2 justify-center mb-5">
+                    {[[1,0],[3,0],[5,0],[10,0],[15,0],[30,0]].map(([m, s]) => (
+                      <button key={m}
+                        className="chalk-btn px-3 py-1.5 rounded-full text-xs font-bold"
+                        style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk, border: `1px solid ${COLORS.border}` }}
+                        onClick={() => { setTimerMins(m); setTimerSecs(s); }}>
+                        {m}分
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ボタン群 */}
+              <div className="flex gap-3 justify-center">
+                {isIdle ? (
+                  <button
+                    onClick={handleTimerStart}
+                    disabled={timerMins === 0 && timerSecs === 0}
+                    className="chalk-btn flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                    style={{
+                      backgroundColor: (timerMins > 0 || timerSecs > 0) ? COLORS.accent : COLORS.border,
+                      color: (timerMins > 0 || timerSecs > 0) ? COLORS.bg : COLORS.muted,
+                      maxWidth: "16rem",
+                    }}>
+                    <Timer size={16} />スタート
+                  </button>
+                ) : (
+                  <>
+                    {!isDone && (
+                      <button
+                        onClick={() => setTimerRunning((r) => !r)}
+                        className="chalk-btn flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                        style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk, border: `1px solid ${COLORS.border}` }}>
+                        {timerRunning ? "⏸ 一時停止" : "▶ 再開"}
+                      </button>
+                    )}
+                    <button
+                      onClick={handleTimerReset}
+                      className="chalk-btn py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                      style={{ backgroundColor: "transparent", color: COLORS.muted, border: `1px solid ${COLORS.border}`, minWidth: "5rem" }}>
+                      <RotateCcw size={14} />リセット
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          );
+        })()}
 
         {/* ── FEEDBACK ── */}
         {currentPage === "feedback" && (

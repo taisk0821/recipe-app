@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import PREFETCHED_IMAGES from "./recipeImages.json";
 import {
   Refrigerator, Flame, Plus, X, Minus, RotateCcw, Users, Soup,
   Clock, Dices, ShoppingCart, CheckCircle2, History, AlarmClock,
@@ -3209,9 +3210,9 @@ function FridgeMenuApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTags, setSearchTags] = useState(new Set());
   const [recipeImages, setRecipeImages] = useState(() => {
-    // TTL 切れでも既存のキャッシュ画像はそのまま使う（差分取得で補完するため）
+    // 事前取得済み画像（recipeImages.json）とローカルキャッシュをマージ
     const cached = LS.get(UNSPLASH_CACHE_KEY, null);
-    return cached?.images ?? {};
+    return { ...PREFETCHED_IMAGES, ...(cached?.images ?? {}) };
   });
   const [historyView, setHistoryView] = useState("list");
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -3268,9 +3269,9 @@ function FridgeMenuApp() {
     const apiKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
     if (!apiKey) return;
 
-    // 既存キャッシュを読み込み、未取得の ID だけ差分フェッチする
+    // 事前取得済み + ローカルキャッシュをマージして、未取得の ID だけ差分フェッチする
     const saved = LS.get(UNSPLASH_CACHE_KEY, null);
-    const existing = saved?.images ?? {};
+    const existing = { ...PREFETCHED_IMAGES, ...(saved?.images ?? {}) };
 
     // TTL 内かつ全 ID がキャッシュ済みなら何もしない
     const allIds = Object.keys(RECIPE_SEARCH_TERMS);
@@ -3288,11 +3289,12 @@ function FridgeMenuApp() {
         if (cancelled) break;
         try {
           const res = await fetch(
-            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(RECIPE_SEARCH_TERMS[id])}&per_page=1&orientation=landscape&content_filter=high`,
+            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(RECIPE_SEARCH_TERMS[id])}&per_page=1&content_filter=high`,
             { headers: { Authorization: `Client-ID ${apiKey}` } }
           );
           // レート制限に達したらこのセッションは中断（次回起動時に続きから再開）
-          if (res.status === 429) break;
+          // Unsplash は 429 または 403 でレート制限を通知する
+          if (res.status === 429 || res.status === 403) break;
           if (res.ok) {
             const data = await res.json();
             const photo = data.results?.[0];

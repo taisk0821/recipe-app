@@ -74,6 +74,11 @@ const RECIPE_EMOJIS = {
   164: "🦐", 165: "🌶️", 166: "🥢", 167: "🥬", 168: "🍗",
   169: "🥩", 170: "🍖", 171: "🍗", 172: "🍅", 173: "🍝",
   174: "🥔", 175: "🐟",
+  176: "🍛", 177: "🥘", 178: "🥚", 179: "🌶️", 180: "🥩",
+  181: "🐟", 182: "🍚", 183: "🍙", 184: "🍜", 185: "🥚",
+  186: "🥬", 187: "🍆", 188: "🌿", 189: "🍖", 190: "🦐",
+  191: "🍢", 192: "🥕", 193: "🥞", 194: "🍞", 195: "🍞",
+  196: "🥪", 197: "🥪", 198: "🍅", 199: "🐟", 200: "🍞",
 };
 
 const CARD_GRADIENTS = [
@@ -260,9 +265,34 @@ const RECIPE_SEARCH_TERMS = {
   173: "pasta chicken macaroni gratin white sauce",
   174: "hash brown potato pancake crispy",
   175: "salmon cream sauce white butter french",
+  176: "japanese curry rice chicken potato vegetable",
+  177: "hayashi rice beef tomato demi-glace japanese",
+  178: "tenshinhan chinese egg omelette rice bowl",
+  179: "dry curry keema ground meat rice japanese",
+  180: "nikudofu beef tofu rice bowl japanese",
+  181: "salmon flakes rice bowl japanese healthy",
+  182: "zosui japanese rice porridge egg soup",
+  183: "yaki onigiri grilled rice ball soy japanese",
+  184: "udon noodle pork miso soup japanese",
+  185: "vegetable egg rice bowl oyakodon japanese",
+  186: "stuffed green pepper meat japanese",
+  187: "agedashi eggplant japanese fried soaked dashi",
+  188: "nira chijimi korean pancake garlic chive",
+  189: "pork belly green onion salt grilled japanese",
+  190: "ebi mayo shrimp mayonnaise japanese style",
+  191: "atsuage tofu miso green onion grilled japanese",
+  192: "daikon radish steak braised soy butter japanese",
+  193: "okonomiyaki japanese pancake cabbage pork savory",
+  194: "french toast egg milk butter breakfast",
+  195: "garlic toast bread butter garlic herb crispy",
+  196: "egg sandwich tamagosando japanese soft bread",
+  197: "hot sandwich toasted club bacon egg cabbage",
+  198: "tomato bacon open toast bruschetta bread",
+  199: "tuna green onion japanese toast sesame",
+  200: "natto toast fermented beans japanese breakfast",
 };
 
-const UNSPLASH_CACHE_KEY = "unsplash_cache_v10";
+const UNSPLASH_CACHE_KEY = "unsplash_cache_v11";
 const UNSPLASH_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 const UNITS = {
@@ -276,6 +306,7 @@ const UNITS = {
   そば: "束", 油揚げ: "枚", 米: "合",
   こんにゃく: "枚", 切り干し大根: "g", ひじき: "g", きゅうり: "本",
   春雨: "g",
+  パン: "枚",
 };
 
 const DEFAULT_QTY = {
@@ -289,6 +320,7 @@ const DEFAULT_QTY = {
   そば: 2, 油揚げ: 2, 米: 2,
   こんにゃく: 1, 切り干し大根: 30, ひじき: 20, きゅうり: 2,
   春雨: 50,
+  パン: 2,
 };
 
 const STEP_QTY = {
@@ -302,6 +334,7 @@ const STEP_QTY = {
   そば: 1, 油揚げ: 1, 米: 1,
   こんにゃく: 1, 切り干し大根: 10, ひじき: 5, きゅうり: 1,
   春雨: 25,
+  パン: 1,
 };
 
 const ALL_INGREDIENTS = [
@@ -315,6 +348,7 @@ const ALL_INGREDIENTS = [
   "そば", "油揚げ", "米",
   "こんにゃく", "切り干し大根", "ひじき", "きゅうり",
   "春雨",
+  "パン",
 ];
 
 const RECIPES = [
@@ -2655,6 +2689,362 @@ const RECIPES = [
       "フライパンにバター15gを溶かし、鮭を両面焼いて取り出す",
       "同じフライパンで玉ねぎを炒め、小麦粉大さじ1を振り入れて炒め、牛乳300mlを加える",
       "コンソメ1個・醤油小さじ1・塩こしょうでソースを作り、鮭を戻して2〜3分煮たら完成",
+    ],
+  },
+  {
+    id: 176, name: "カレーライス", kcal: 650, time: 30, moods: ["gatsuri", "attaka"],
+    ingredients: [
+      { name: "豚肉", amount: 250 }, { name: "じゃがいも", amount: 2 },
+      { name: "にんじん", amount: 1 }, { name: "玉ねぎ", amount: 1 }, { name: "ごはん", amount: 2 },
+    ],
+    seasonings: ["コンソメ", "バター", "サラダ油", "塩", "こしょう"],
+    steps: [
+      "豚肉250gを一口大に切る。じゃがいも2個・にんじん1本・玉ねぎ1個を乱切りにする",
+      "鍋にサラダ油大さじ1を熱し、豚肉を炒め、野菜を加えてさらに炒める",
+      "水700ml・コンソメ1個を加えて蓋をして中火で15分煮る",
+      "火を弱め、カレールー（またはカレー粉大さじ2・バター10g・塩少々）を加えて溶かす",
+      "弱火で5分煮てとろみをつけ、ごはんに盛り付けたら完成",
+    ],
+  },
+  {
+    id: 177, name: "ハヤシライス", kcal: 590, time: 25, moods: ["gatsuri", "attaka"],
+    ingredients: [
+      { name: "牛肉", amount: 200 }, { name: "玉ねぎ", amount: 1 },
+      { name: "トマト", amount: 2 }, { name: "ごはん", amount: 2 },
+    ],
+    seasonings: ["バター", "コンソメ", "醤油", "サラダ油", "塩", "こしょう"],
+    steps: [
+      "牛肉200gを薄切りにする。玉ねぎ1個を薄切り、トマト2個を角切りにする",
+      "鍋にバター10gを溶かし、玉ねぎを飴色になるまで5〜6分炒める",
+      "牛肉を加えて炒め、色が変わったらトマトを加えてさらに炒める",
+      "水400ml・コンソメ1個を加えて10分煮る",
+      "醤油大さじ1・ケチャップ大さじ3（あれば）・塩こしょうで味を調え、5分煮てごはんに盛り完成",
+    ],
+  },
+  {
+    id: 178, name: "天津飯", kcal: 480, time: 12, moods: ["jitan", "gatsuri"],
+    ingredients: [
+      { name: "ごはん", amount: 2 }, { name: "卵", amount: 3 }, { name: "ねぎ", amount: 1 },
+    ],
+    seasonings: ["醤油", "みりん", "砂糖", "ごま油", "鶏ガラスープの素", "サラダ油"],
+    steps: [
+      "ねぎ1本のみじん切りと卵3個・塩こしょうを混ぜる",
+      "フライパンにサラダ油大さじ2を熱し、卵液を流し込んで大きく混ぜながら半熟のふんわり卵を作る",
+      "ごはんに卵をのせる",
+      "あん：水150ml・鶏ガラスープの素小さじ1・醤油大さじ1・みりん大さじ1・砂糖小さじ1を鍋で煮立て、水溶き片栗粉（あれば）でとろみをつける",
+      "ごま油小さじ1を加えたあんをごはんにかけたら完成",
+    ],
+  },
+  {
+    id: 179, name: "ドライカレー", kcal: 520, time: 20, moods: ["jitan", "gatsuri"],
+    ingredients: [
+      { name: "ひき肉", amount: 200 }, { name: "玉ねぎ", amount: 1 },
+      { name: "にんじん", amount: 1 }, { name: "ごはん", amount: 2 },
+    ],
+    seasonings: ["コンソメ", "サラダ油", "塩", "こしょう"],
+    steps: [
+      "玉ねぎ1個・にんじん1本をみじん切りにする",
+      "フライパンにサラダ油大さじ1を熱し、みじん切り野菜を5分炒める",
+      "ひき肉200gを加えてそぼろ状に炒める",
+      "水100ml・コンソメ1個・カレー粉大さじ1〜2（あれば）・塩こしょうを加えて水分が飛ぶまで炒める",
+      "ごはんに盛り付け、目玉焼き（あれば）をのせたら完成",
+    ],
+  },
+  {
+    id: 180, name: "肉豆腐丼", kcal: 490, time: 15, moods: ["gatsuri", "attaka"],
+    ingredients: [
+      { name: "ごはん", amount: 2 }, { name: "牛肉", amount: 150 },
+      { name: "豆腐", amount: 1 }, { name: "玉ねぎ", amount: 1 },
+    ],
+    seasonings: ["醤油", "みりん", "砂糖", "酒", "顆粒だし"],
+    steps: [
+      "牛肉150gを食べやすく切る。玉ねぎ1個を薄切り、豆腐1丁を一口大に切る",
+      "鍋に水200ml・顆粒だし小さじ1・醤油大さじ2・みりん大さじ2・砂糖大さじ1・酒大さじ1を合わせて中火にかける",
+      "玉ねぎを加えて3分煮る",
+      "牛肉と豆腐を加えて5〜6分、牛肉に火が通るまで煮る",
+      "ごはんに盛り付けたら完成",
+    ],
+  },
+  {
+    id: 181, name: "鮭フレーク丼", kcal: 430, time: 10, moods: ["sappari", "jitan"],
+    ingredients: [
+      { name: "ごはん", amount: 2 }, { name: "鮭", amount: 2 }, { name: "ねぎ", amount: 1 },
+    ],
+    seasonings: ["醤油", "みりん", "酒", "ごま油"],
+    steps: [
+      "鮭2切れに酒少々を振りかけてフライパンで両面焼く",
+      "皮と骨を取り除きながら大きめにほぐす",
+      "フライパンにみりん大さじ1・醤油大さじ1を加えて弱火で炒りつけ、水分を飛ばす",
+      "ごはんに鮭フレークをのせる",
+      "ごま油少々を回しかけ、ねぎの薄切りをのせたら完成",
+    ],
+  },
+  {
+    id: 182, name: "残りご飯の雑炊", kcal: 220, time: 12, moods: ["attaka", "sappari", "jitan"],
+    ingredients: [
+      { name: "ごはん", amount: 1 }, { name: "卵", amount: 1 }, { name: "ねぎ", amount: 1 },
+    ],
+    seasonings: ["顆粒だし", "醤油", "塩", "酒"],
+    steps: [
+      "鍋に水400ml・顆粒だし小さじ1・酒大さじ1を入れて中火にかける",
+      "沸騰したら残りごはん1杯をほぐしながら加える",
+      "醤油小さじ2・塩少々で味を調え、弱火で3〜4分煮る",
+      "溶き卵1個を回し入れてふんわりさせ、蓋をして30秒で火を止める",
+      "ねぎの薄切りをのせたら完成（冷蔵庫の残り野菜や鶏肉を加えてもよい）",
+    ],
+  },
+  {
+    id: 183, name: "焼きおにぎり", kcal: 300, time: 10, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "ごはん", amount: 2 },
+    ],
+    seasonings: ["醤油", "みりん", "ごま油"],
+    steps: [
+      "残りごはん2杯を三角形に握る（手に水と塩少々をつけて）",
+      "フライパンにごま油小さじ1を熱し、おにぎりを並べて中火で焼く",
+      "底面に焼き色がついたら裏返して反対側も焼く",
+      "醤油大さじ1・みりん大さじ1を合わせたタレをはけ（またはスプーン）で塗る",
+      "再度30秒ほど焼いて香ばしく仕上げたら完成",
+    ],
+  },
+  {
+    id: 184, name: "豚汁リメイクうどん", kcal: 320, time: 8, moods: ["attaka", "jitan"],
+    ingredients: [
+      { name: "うどん", amount: 1 }, { name: "豚肉", amount: 100 }, { name: "ねぎ", amount: 1 },
+    ],
+    seasonings: ["味噌", "顆粒だし", "醤油", "みりん"],
+    steps: [
+      "前日の豚汁を鍋で温める（なければ水500ml・顆粒だし小さじ1・味噌大さじ2で即席スープを作る）",
+      "スープの量が少ない場合は水を足して薄めに調整する",
+      "冷凍うどん1玉を凍ったまま加えて2〜3分煮る",
+      "みりん小さじ1・醤油小さじ1で味を引き締める",
+      "器に盛り、ねぎの薄切りをのせたら完成",
+    ],
+  },
+  {
+    id: 185, name: "残り野菜の卵とじ丼", kcal: 350, time: 12, moods: ["jitan", "gatsuri"],
+    ingredients: [
+      { name: "ごはん", amount: 2 }, { name: "卵", amount: 2 },
+      { name: "玉ねぎ", amount: 1 }, { name: "にんじん", amount: 1 },
+    ],
+    seasonings: ["顆粒だし", "醤油", "みりん", "砂糖", "酒"],
+    steps: [
+      "冷蔵庫の残り野菜（玉ねぎ・にんじんなど）を薄切りや細切りにする",
+      "フライパンに水150ml・顆粒だし小さじ1・醤油大さじ1.5・みりん大さじ1.5・砂糖小さじ1を入れて中火にかける",
+      "野菜を加えて3〜4分、しんなりするまで煮る",
+      "溶き卵2個を回し入れ、半熟状になったら火を止める",
+      "ごはんに盛り付けたら完成（残り鶏肉や豚肉があれば一緒に煮ても美味しい）",
+    ],
+  },
+  {
+    id: 186, name: "ピーマンの肉詰め", kcal: 280, time: 20, moods: ["jitan", "gatsuri"],
+    ingredients: [
+      { name: "ピーマン", amount: 3 }, { name: "ひき肉", amount: 200 },
+    ],
+    seasonings: ["醤油", "みりん", "砂糖", "サラダ油", "塩", "こしょう"],
+    steps: [
+      "ピーマン3個を縦半分に切り、種とワタを取り除く",
+      "ひき肉200gに塩こしょう少々・醤油小さじ1を混ぜてタネを作る",
+      "ピーマンの内側に片栗粉（あれば）を薄くはたき、タネをしっかり詰める",
+      "フライパンにサラダ油大さじ1を熱し、肉面を下にして中火で3分焼く",
+      "裏返して蓋をして3分蒸し焼きにし、醤油大さじ1・みりん大さじ1・砂糖小さじ1のタレを絡めたら完成",
+    ],
+  },
+  {
+    id: 187, name: "なすの揚げ浸し", kcal: 170, time: 20, moods: ["sappari", "jitan"],
+    ingredients: [
+      { name: "なす", amount: 3 },
+    ],
+    seasonings: ["醤油", "みりん", "砂糖", "顆粒だし", "サラダ油"],
+    steps: [
+      "なす3本を一口大の乱切りにする",
+      "浸し液：水150ml・顆粒だし小さじ1・醤油大さじ2・みりん大さじ1・砂糖小さじ1を合わせて一煮立ちさせる",
+      "フライパンにサラダ油を多めに（大さじ3）熱し、なすを中火で揚げ焼きにする",
+      "両面こんがり焼けたら熱いうちに浸し液に漬ける",
+      "15分以上漬けたら完成（冷やして食べると一層さっぱり美味しい）",
+    ],
+  },
+  {
+    id: 188, name: "ニラのチヂミ風", kcal: 290, time: 15, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "にら", amount: 1 }, { name: "卵", amount: 2 },
+    ],
+    seasonings: ["醤油", "ごま油", "サラダ油", "塩", "こしょう"],
+    steps: [
+      "にら1袋を3cm長さに切る",
+      "ボウルに卵2個・水大さじ3・薄力粉大さじ3（あれば）・塩少々を混ぜ、にらを加えてタネを作る",
+      "フライパンにサラダ油大さじ2を熱し、タネを流し込んで薄く広げる",
+      "中火で3〜4分焼き、底面がカリッとしたら裏返してさらに2〜3分焼く",
+      "醤油大さじ1・ごま油小さじ1を合わせたタレで食べたら完成",
+    ],
+  },
+  {
+    id: 189, name: "豚バラのネギ塩焼き", kcal: 380, time: 15, moods: ["jitan", "gatsuri"],
+    ingredients: [
+      { name: "豚肉", amount: 250 }, { name: "ねぎ", amount: 1 },
+    ],
+    seasonings: ["塩", "こしょう", "ごま油", "サラダ油", "にんにく(チューブ)"],
+    steps: [
+      "豚肉250gを食べやすい大きさに切る。ねぎ1本を薄い小口切りにする",
+      "ネギ塩ダレを作る：ねぎ全量・塩小さじ1/2・こしょう少々・ごま油大さじ1・にんにくチューブ1cmを混ぜる",
+      "フライパンにサラダ油大さじ1を熱し、豚肉を中火でしっかり焼く",
+      "両面に焼き色がついたら余分な脂をふき取る",
+      "ネギ塩ダレを加えてさっと絡めたら完成",
+    ],
+  },
+  {
+    id: 190, name: "えびマヨ", kcal: 260, time: 12, moods: ["sappari", "jitan"],
+    ingredients: [
+      { name: "えび", amount: 200 },
+    ],
+    seasonings: ["塩", "こしょう", "サラダ油", "酒", "砂糖"],
+    steps: [
+      "えび200gを殻と背わたを取り、酒少々・塩こしょうで下味をつける",
+      "片栗粉（あれば）を薄くまぶす",
+      "フライパンにサラダ油大さじ1を熱し、えびをカリッとなるまで炒め揚げにする",
+      "マヨネーズ大さじ3・砂糖小さじ1・ケチャップ小さじ1（いずれも自由入力）を合わせてソースを作る",
+      "えびをソースで和えてレタスや千切りキャベツの上に盛り付けたら完成",
+    ],
+  },
+  {
+    id: 191, name: "厚揚げのねぎみそ焼き", kcal: 230, time: 12, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "厚揚げ", amount: 1 }, { name: "ねぎ", amount: 1 },
+    ],
+    seasonings: ["味噌", "みりん", "砂糖", "ごま油", "サラダ油"],
+    steps: [
+      "厚揚げ1個を1.5cm厚さに切る。ねぎ1本をみじん切りにする",
+      "ねぎ味噌を作る：ねぎ・味噌大さじ1・みりん大さじ1・砂糖小さじ1・ごま油小さじ1を混ぜる",
+      "厚揚げの表面にねぎ味噌を塗る",
+      "フライパンにサラダ油少々を熱し、厚揚げを味噌面を下にして中火で2〜3分焼く",
+      "焦げ目がついたら裏返し、1〜2分焼いたら完成",
+    ],
+  },
+  {
+    id: 192, name: "大根のステーキ", kcal: 130, time: 15, moods: ["sappari", "jitan"],
+    ingredients: [
+      { name: "大根", amount: 10 },
+    ],
+    seasonings: ["醤油", "みりん", "砂糖", "サラダ油", "バター"],
+    steps: [
+      "大根10cm分を2cm厚さの輪切りにし、片面に格子状の切り込みを入れる",
+      "鍋に大根がかぶるくらいの水を入れ、5分下茹でして柔らかくする",
+      "フライパンにサラダ油大さじ1を熱し、大根を並べて中火で焼く",
+      "両面に焼き色がついたらバター5gを加えて香りをつける",
+      "醤油大さじ1・みりん大さじ1・砂糖小さじ1を合わせたタレを絡めたら完成",
+    ],
+  },
+  {
+    id: 193, name: "お好み焼き", kcal: 420, time: 20, moods: ["gatsuri", "jitan"],
+    ingredients: [
+      { name: "キャベツ", amount: 200 }, { name: "豚肉", amount: 150 }, { name: "卵", amount: 2 },
+    ],
+    seasonings: ["醤油", "塩", "こしょう", "サラダ油", "ごま油"],
+    steps: [
+      "キャベツ200gをみじん切りにする。豚肉150gを食べやすく切る",
+      "ボウルに卵2個・水50ml・薄力粉50g（大さじ4）・塩少々を混ぜてタネを作る",
+      "キャベツを加えてよく混ぜる",
+      "フライパンにサラダ油大さじ1を熱し、タネを丸く広げて豚肉を並べ、中火で4〜5分焼く",
+      "裏返してさらに4〜5分焼き、ソース（あれば）・醤油・ごま油でいただいたら完成",
+    ],
+  },
+  {
+    id: 194, name: "フレンチトースト", kcal: 320, time: 12, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "パン", amount: 2 }, { name: "卵", amount: 2 }, { name: "牛乳", amount: 100 },
+    ],
+    seasonings: ["砂糖", "バター"],
+    steps: [
+      "卵2個・牛乳100ml・砂糖大さじ1を混ぜ合わせて卵液を作る",
+      "パン2枚を卵液に両面5分以上浸す",
+      "フライパンにバター15gを溶かし、弱〜中火でパンを並べて焼く",
+      "底面が黄金色になったら裏返し、反対側も2〜3分焼く",
+      "シロップ（あれば）や粉砂糖をかけたら完成",
+    ],
+  },
+  {
+    id: 195, name: "ガーリックトースト", kcal: 210, time: 8, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "パン", amount: 2 },
+    ],
+    seasonings: ["バター", "にんにく(チューブ)", "塩"],
+    steps: [
+      "バター20gを室温で柔らかくし、にんにくチューブ1cm・塩少々を混ぜてガーリックバターを作る",
+      "パン2枚の片面にガーリックバターを均一に塗る",
+      "オーブントースターで3〜4分焼く",
+      "表面がカリッとして縁に焼き色がついたら完成",
+      "パセリのみじん切り（あれば）を散らすと風味アップ",
+    ],
+  },
+  {
+    id: 196, name: "卵サンド", kcal: 350, time: 12, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "パン", amount: 4 }, { name: "卵", amount: 3 },
+    ],
+    seasonings: ["塩", "こしょう", "バター"],
+    steps: [
+      "卵3個を沸騰した湯で10分ゆでて固ゆで卵にし、殻をむく",
+      "ゆで卵を粗みじんに切り、マヨネーズ大さじ2（自由入力）・塩こしょう少々と混ぜてフィリングを作る",
+      "パン4枚の片面にバター少々を薄く塗る",
+      "2枚のパンに卵フィリングをのせ、残り2枚で挟む",
+      "端を切り落として半分に切ったら完成",
+    ],
+  },
+  {
+    id: 197, name: "ホットサンド", kcal: 380, time: 12, moods: ["jitan", "gatsuri"],
+    ingredients: [
+      { name: "パン", amount: 4 }, { name: "卵", amount: 1 },
+      { name: "ベーコン", amount: 3 }, { name: "キャベツ", amount: 150 },
+    ],
+    seasonings: ["塩", "こしょう", "バター"],
+    steps: [
+      "キャベツ150gを千切りにして塩少々でもみ、水気を絞る",
+      "フライパンでベーコン3枚をカリッと焼き、卵1個を目玉焼きにする",
+      "パン4枚の片面にバター少々を薄く塗る",
+      "2枚のパンにキャベツ・ベーコン・目玉焼きをのせ、残り2枚で挟む",
+      "フライパンまたはホットサンドメーカーで両面を押しながら焼いたら完成",
+    ],
+  },
+  {
+    id: 198, name: "トマトとベーコンのオープントースト", kcal: 310, time: 10, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "パン", amount: 2 }, { name: "ベーコン", amount: 2 }, { name: "トマト", amount: 1 },
+    ],
+    seasonings: ["塩", "こしょう", "バター", "にんにく(チューブ)"],
+    steps: [
+      "パン2枚の片面にバター少々ととにんにくチューブ少々を薄く塗る",
+      "ベーコン2枚を食べやすい大きさに切る",
+      "トマト1個を5mm厚さの輪切りにする",
+      "パンにベーコンとトマトをのせ、塩こしょうを振る",
+      "オーブントースターで4〜5分、チーズ（あれば）をのせて焼いたら完成",
+    ],
+  },
+  {
+    id: 199, name: "ツナとねぎの和風トースト", kcal: 280, time: 8, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "パン", amount: 2 }, { name: "ツナ", amount: 1 }, { name: "ねぎ", amount: 1 },
+    ],
+    seasonings: ["醤油", "ごま油", "塩"],
+    steps: [
+      "ツナ缶1缶の油を切る。ねぎ1本を薄い小口切りにする",
+      "ツナ・ねぎ・醤油小さじ1・ごま油小さじ1・塩少々を混ぜる",
+      "パン2枚にツナねぎを均等にのせる",
+      "オーブントースターで3〜4分焼く",
+      "表面が少しカリッとしたら完成（チーズをのせて焼いても美味しい）",
+    ],
+  },
+  {
+    id: 200, name: "納豆トースト", kcal: 200, time: 5, moods: ["jitan", "sappari"],
+    ingredients: [
+      { name: "パン", amount: 2 }, { name: "納豆", amount: 2 },
+    ],
+    seasonings: ["醤油", "ごま油"],
+    steps: [
+      "納豆2パックを付属のタレ（または醤油小さじ1）でよくかき混ぜる",
+      "パン2枚をオーブントースターでこんがりと焼く",
+      "焼き上がったパンに納豆を均等にのせる",
+      "ごま油を数滴たらして香りをつける",
+      "お好みでねぎの薄切りや卵黄（あれば）をのせたら完成",
     ],
   },
 ];

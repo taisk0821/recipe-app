@@ -3927,28 +3927,41 @@ export default function FridgeMenuApp() {
                           </div>
                         </div>
 
-                        {recipe.seasonings.length > 0 && (
-                          <div className="mb-2">
-                            <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>使う調味料</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {recipe.seasonings.map((s) => {
-                                const has = pantry.has(s);
-                                return (
-                                  <button key={s} onClick={() => !has && addToShoppingList(s)}
-                                    className="px-2.5 py-1 rounded-full text-xs"
-                                    style={{
-                                      backgroundColor: has ? COLORS.surfaceAlt : "transparent",
-                                      color: has ? COLORS.chalk : COLORS.accent2,
-                                      border: has ? "none" : `1px solid ${COLORS.accent2}`,
-                                      fontFamily: BODY_FONT, cursor: has ? "default" : "pointer",
-                                    }}>
-                                    {has ? s : `${s} ✕なし +`}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                        {(() => {
+                          const haveS = (recipe.seasonings || []).filter(s => pantry.has(s));
+                          const missS = (recipe.seasonings || []).filter(s => !pantry.has(s));
+                          return (
+                            <>
+                              {haveS.length > 0 && (
+                                <div className="mb-1.5">
+                                  <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>使う調味料</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {haveS.map((s) => (
+                                      <span key={s} className="px-2.5 py-1 rounded-full text-xs"
+                                        style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk, fontFamily: BODY_FONT }}>
+                                        {s}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {missS.length > 0 && (
+                                <div className="mb-2">
+                                  <p className="text-xs mb-1.5" style={{ color: COLORS.accent2 }}>足りない調味料</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {missS.map((s) => (
+                                      <button key={s} onClick={() => addToShoppingList(s)}
+                                        className="px-2.5 py-1 rounded-full text-xs"
+                                        style={{ backgroundColor: "transparent", color: COLORS.accent2, border: `1px solid ${COLORS.accent2}`, fontFamily: BODY_FONT, cursor: "pointer" }}>
+                                        {s} +
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
 
                         <div className="flex gap-2 mt-3">
                           <button onClick={() => toggleSteps(recipe.id)}
@@ -4199,22 +4212,41 @@ export default function FridgeMenuApp() {
                                 </div>
                               </div>
 
-                              {recipe.seasonings.length > 0 && (
-                                <div className="mb-3">
-                                  <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>使う調味料</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {recipe.seasonings.map((s) => {
-                                      const has = pantry.has(s);
-                                      return (
-                                        <span key={s} className="px-2.5 py-1 rounded-full text-xs"
-                                          style={{ backgroundColor: has ? COLORS.surfaceAlt : "transparent", color: has ? COLORS.chalk : COLORS.accent2, border: has ? "none" : `1px solid ${COLORS.accent2}`, fontFamily: BODY_FONT }}>
-                                          {has ? s : `${s} ✕なし`}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
+                              {(() => {
+                                const haveS = (recipe.seasonings || []).filter(s => pantry.has(s));
+                                const missS = (recipe.seasonings || []).filter(s => !pantry.has(s));
+                                return (
+                                  <>
+                                    {haveS.length > 0 && (
+                                      <div className="mb-1.5">
+                                        <p className="text-xs mb-1.5" style={{ color: COLORS.muted }}>使う調味料</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {haveS.map((s) => (
+                                            <span key={s} className="px-2.5 py-1 rounded-full text-xs"
+                                              style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.chalk, fontFamily: BODY_FONT }}>
+                                              {s}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {missS.length > 0 && (
+                                      <div className="mb-3">
+                                        <p className="text-xs mb-1.5" style={{ color: COLORS.accent2 }}>足りない調味料</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {missS.map((s) => (
+                                            <button key={s} onClick={() => addToShoppingList(s)}
+                                              className="px-2.5 py-1 rounded-full text-xs"
+                                              style={{ backgroundColor: "transparent", color: COLORS.accent2, border: `1px solid ${COLORS.accent2}`, fontFamily: BODY_FONT, cursor: "pointer" }}>
+                                              {s} +
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
 
                               {missingDetails.length > 0 && (
                                 <button onClick={() => addAllMissingToShopping(recipe.details)}

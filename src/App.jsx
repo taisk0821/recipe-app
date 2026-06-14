@@ -293,8 +293,8 @@ const RECIPE_SEARCH_TERMS = {
   200: "natto toast fermented beans japanese breakfast",
 };
 
-const UNSPLASH_CACHE_KEY = "unsplash_cache_v11";
-const UNSPLASH_CACHE_TTL = 24 * 60 * 60 * 1000;
+const UNSPLASH_CACHE_KEY = "unsplash_cache_v12";
+const UNSPLASH_CACHE_TTL = 90 * 24 * 60 * 60 * 1000; // 90日
 
 const UNITS = {
   卵: "個", 豚肉: "g", 鶏肉: "g", キャベツ: "g", にんじん: "本", 玉ねぎ: "個", ねぎ: "本",
@@ -3209,9 +3209,9 @@ function FridgeMenuApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTags, setSearchTags] = useState(new Set());
   const [recipeImages, setRecipeImages] = useState(() => {
+    // TTL 切れでも既存のキャッシュ画像はそのまま使う（差分取得で補完するため）
     const cached = LS.get(UNSPLASH_CACHE_KEY, null);
-    if (cached && Date.now() - cached.fetchedAt < UNSPLASH_CACHE_TTL) return cached.images;
-    return {};
+    return cached?.images ?? {};
   });
   const [historyView, setHistoryView] = useState("list");
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -3267,37 +3267,59 @@ function FridgeMenuApp() {
   useEffect(() => {
     const apiKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
     if (!apiKey) return;
-    const cached = LS.get(UNSPLASH_CACHE_KEY, null);
-    if (cached && Date.now() - cached.fetchedAt < UNSPLASH_CACHE_TTL) return;
 
-    const fetchAll = async () => {
-      const pairs = await Promise.all(
-        Object.entries(RECIPE_SEARCH_TERMS).map(async ([id, term]) => {
-          try {
-            const res = await fetch(
-              `https://api.unsplash.com/search/photos?query=${encodeURIComponent(term)}&per_page=1&orientation=landscape&content_filter=high`,
-              { headers: { Authorization: `Client-ID ${apiKey}` } }
-            );
-            if (!res.ok) return null;
+    // 既存キャッシュを読み込み、未取得の ID だけ差分フェッチする
+    const saved = LS.get(UNSPLASH_CACHE_KEY, null);
+    const existing = saved?.images ?? {};
+
+    // TTL 内かつ全 ID がキャッシュ済みなら何もしない
+    const allIds = Object.keys(RECIPE_SEARCH_TERMS);
+    const missing = allIds.filter((id) => !existing[id]);
+    if (
+      missing.length === 0 ||
+      (saved?.fetchedAt && Date.now() - saved.fetchedAt < UNSPLASH_CACHE_TTL && missing.length === 0)
+    ) return;
+
+    let cancelled = false;
+    const images = { ...existing };
+
+    const fetchMissing = async () => {
+      for (const id of missing) {
+        if (cancelled) break;
+        try {
+          const res = await fetch(
+            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(RECIPE_SEARCH_TERMS[id])}&per_page=1&orientation=landscape&content_filter=high`,
+            { headers: { Authorization: `Client-ID ${apiKey}` } }
+          );
+          // レート制限に達したらこのセッションは中断（次回起動時に続きから再開）
+          if (res.status === 429) break;
+          if (res.ok) {
             const data = await res.json();
             const photo = data.results?.[0];
-            if (!photo?.urls?.small) return null;
-            return [id, {
-              url: photo.urls.small,
-              photographer: photo.user.name,
-              photographerUrl: `${photo.user.links.html}?utm_source=kyou_no_gohan&utm_medium=referral`,
-              unsplashUrl: `${photo.links.html}?utm_source=kyou_no_gohan&utm_medium=referral`,
-            }];
-          } catch {
-            return null;
+            if (photo?.urls?.small) {
+              images[id] = {
+                url: photo.urls.small,
+                photographer: photo.user.name,
+                photographerUrl: `${photo.user.links.html}?utm_source=kyou_no_gohan&utm_medium=referral`,
+                unsplashUrl: `${photo.links.html}?utm_source=kyou_no_gohan&utm_medium=referral`,
+              };
+              // 1 件取得ごとにキャッシュを保存（途中でタブを閉じても無駄にならない）
+              if (!cancelled) {
+                setRecipeImages({ ...images });
+                LS.set(UNSPLASH_CACHE_KEY, { fetchedAt: Date.now(), images: { ...images } });
+              }
+            }
           }
-        })
-      );
-      const images = Object.fromEntries(pairs.filter(Boolean));
-      setRecipeImages(images);
-      LS.set(UNSPLASH_CACHE_KEY, { fetchedAt: Date.now(), images });
+        } catch {
+          // ネットワークエラーは次の ID へ
+        }
+        // レート制限対策: 1 件取得ごとに 1.3 秒待機（≒ 46 req/min ≈ 46 req/hour 以内）
+        if (!cancelled) await new Promise((r) => setTimeout(r, 1300));
+      }
     };
-    fetchAll();
+
+    fetchMissing();
+    return () => { cancelled = true; };
   }, []);
 
   const selectedNames = Object.keys(fridge);
